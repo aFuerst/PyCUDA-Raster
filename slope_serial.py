@@ -14,11 +14,7 @@ def main():
   cellsize = float(params[4].split()[1])
   NODATA = float(params[5].split()[1])
 
-#raw_data = []
-  #for line in params[6:]:
-  #  raw_data.append(line.split())
-  #data = np.asarray(raw_data)
-  #data = data.astype(np.float)
+  # read data in as n by m list of numpy floats
   data = np.loadtxt(open("aigrid.asc"), skiprows=6)
   
   slope_data = calc_slope(data, cellsize, NODATA)
@@ -34,26 +30,18 @@ def calc_slope(grid, cellsize, NODATA):
   return slope_grid
 
 def cell_slope(grid, row, col, cellsize, NODATA):
-  #if row==len(grid)-1 or col==len(grid[0])-1 or row==0 or col==0:
-    #TODO: Come back to this case later...
-    #return NODATA
-
+  if nbhd[4] == NODATA:
+    return NODATA
+	
   #First, grab values for cells used in calculation
   nbhd = []
   for i in range(-1,2):
     for j in range(-1,2):
       #If out of bounds, log NODATA, these will be changed later.
-      if row+i<=0 or row+i>=len(grid) or col+j<=0 or col+j>=len(grid[0]):
+      if row+i<=0 or row+i>=len(grid) or col+j<=0 or col+j>=len(grid[0]) or grid[row + i][col +j] == NODATA:
         nbhd.append(NODATA)
-        continue
-      nbhd.append(grid[row+i,col+j])
-
-  if nbhd[4] == NODATA:
-    return NODATA
-
-  for i in range(len(nbhd)):
-    if nbhd[i] == NODATA:
-      nbhd[i] = nbhd[4]
+      else:
+		nbhd.append(grid[row+i,col+j])
 
   dz_dx = (nbhd[2] + 2*nbhd[5] + nbhd[8] - (nbhd[0] + 2*nbhd[3] + nbhd[6])) \
                 / (8*cellsize)
