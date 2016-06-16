@@ -2,10 +2,6 @@ import numpy as np
 from os.path import abspath
 
 def main(inputPath, outputPath):
-
-	#f = open("test.txt", "w+")
-	#f.write(inputPath)
-	#f.write(outputPath)
 	input_file = open(inputPath)
 	params = input_file.readlines()
 	input_file.close()
@@ -17,11 +13,11 @@ def main(inputPath, outputPath):
 	NODATA = float(params[5].split()[1])
 
 	# read data in as n by m list of numpy floats
-	#data = np.loadtxt(open("aigrid.asc"), skiprows=6)
+	data = np.loadtxt(open(inputPath), skiprows=6)
   
 	#slope_data = calc_slope(data, cellsize, NODATA)
 	#print slope_data
-	#np.savetxt("output.txt", slope_data, fmt='%5.2f')
+	np.savetxt(outputPath, slope_data, fmt='%5.2f')
 
 def calc_slope(grid, cellsize, NODATA):
 	slope_grid = np.zeros_like(grid)
@@ -32,7 +28,7 @@ def calc_slope(grid, cellsize, NODATA):
 	return slope_grid
 
 def cell_slope(grid, row, col, cellsize, NODATA):
-	if nbhd[4] == NODATA:
+	if grid[row][col] == NODATA:
 		return NODATA
 	
   #First, grab values for cells used in calculation
