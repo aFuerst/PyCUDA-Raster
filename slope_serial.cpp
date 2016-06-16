@@ -8,11 +8,18 @@
 #include <string>
 #include <sstream>
 #include <math.h>
+#include <algorithm>
+#include <iterator>
+#include <vector>
 
-static const int NCOLS = 1051;
-static const int NROWS = 1407;
-static const float CELLSIZE = 10.0;
-static const float NODATA = -32767.0;
+//static const int NCOLS = 1051;
+//static const int NROWS = 1407;
+//static const float CELLSIZE = 10.0;
+//static const float NODATA = -32767.0;
+
+int NCOLS, NROWS;
+float CELLSIZE, NODATA;
+string header[6];
 
 using namespace std;
 
@@ -59,6 +66,58 @@ float** loadFile(string filename){
                 exit(1);
         }
         
+        int count = 0;
+        vector<string> splits;
+        
+        while (count < 6)
+	{
+		//read in header line one at a time
+		getline(inFile, header[count]);
+		//grab number of cols and make into int variable
+		if (count == 0)
+		{
+			istringstream stream(header[count]);
+			copy(istream_iterator<string>(stream),
+				istream_iterator<string>(),
+				back_inserter(splits));
+			NCOLS = stoi(splits[1], nullptr,10);
+			count++;
+		}
+		//grab number of rows and make into int variable
+		else if (count == 1)
+		{
+			istringstream stream(header[count]);
+			copy(istream_iterator<string>(stream),
+				istream_iterator<string>(),
+				back_inserter(splits));
+			NROWS = stoi(splits[3], nullptr, 10);
+			count++;
+		}
+		//grab cell size and maake into float variable
+		else if (count == 4)
+		{
+			istringstream stream(header[count]);
+			copy(istream_iterator<string>(stream),
+				istream_iterator<string>(),
+				back_inserter(splits));
+			CELLSIZE = stof(splits[5]);
+			count++;
+		}
+		//grab no data value and make into float variable
+		else if (count == 5)
+		{
+			istringstream stream(header[count]);
+			copy(istream_iterator<string>(stream),
+				istream_iterator<string>(),
+				back_inserter(splits));
+			NODATA = stof(splits[7]);
+			count++;
+		}
+		//go to next line in header
+		else
+		count++;
+	}
+	
         float** grid = new float* [NROWS];
         for(int k=0; k<NROWS; k++){
                 grid[k] = new float [NCOLS];
