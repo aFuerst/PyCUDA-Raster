@@ -1,3 +1,5 @@
 http://qgis.org/api/2.8/index.html
 
 http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/
+
+http://www.qgistutorials.com/en/docs/learning_resources.html
