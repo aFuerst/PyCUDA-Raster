@@ -2,19 +2,20 @@ import numpy as np
 
 def main():
 
-	input_file = open("aigrid.asc")
-	params = input_file.readlines()
-	input_file.close()
-	ncols = params[0].split()[1]
-	nrows = params[1].split()[1]
-	xllcorner = params[2].split()[1]
-	yllcorner = params[3].split()[1]
-	cellsize = float(params[4].split()[1])
-	NODATA = int(params[5].split()[1])
+	input_file = open("aigrid.asc", 'r')
+	ncols = input_file.readline().split()[1]
+	nrows = input_file.readline().split()[1]
+	xllcorner = input_file.readline().split()[1]
+	yllcorner = input_file.readline().split()[1]
+	cellsize = float(input_file.readline().split()[1])
+	NODATA = int(input_file.readline().split()[1])
 
-  # read data in as n by m list of numpy floats
-	data = np.loadtxt(open("aigrid.asc"), skiprows=6)
-  
+        # read data in as n by m list of numpy floats
+        # NOTE: Don't skip any lines here, the file pointer has already advanced
+        # past the header to the data.
+	data = np.loadtxt(input_file)
+        input_file.close()
+
 	slope_data = calc_slope(data, cellsize, NODATA)
         #set up header
         header_str = ("ncols %s\n"
