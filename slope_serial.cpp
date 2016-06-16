@@ -1,35 +1,56 @@
+/**************************************************
+ * Note, just prints to stdout. Pipe to a file if desired.
+ **************************************************/
+
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
 #include <string>
 #include <sstream>
-#include <vector>
+#include <math.h>
 
-const int NCOLS = 1051;
-const int NROWS = 1407;
-const float CELLSIZE = 10.0;
-const float NODATA = -32767.0;
+static const int NCOLS = 1051;
+static const int NROWS = 1407;
+static const float CELLSIZE = 10.0;
+static const float NODATA = -32767.0;
 
 using namespace std;
 
-vector< vector <float> >* loadFile(string filename);
+float** loadFile(string filename);
+float** calcSlope(float** grid);
+float cellSlope(float** grid, int row, int col);
 
 int main(int argc, char* argv[]){
         if (argc != 2){
                 cerr << "Incorrect number of args" << endl;
+                cout << "Correct usage: ./slope_serial <filename>" << endl;
                 return 1;
         }
 
         string filename(argv[1]);
+        int i, j;
 
         //TODO: Free grid at end of program
-        vector< vector <float> >* grid = loadFile(filename);
+        float** grid = loadFile(filename);
+        float** slope_grid = calcSlope(grid);
+        for (i=0; i<NROWS; i++){
+                for (int j=0; j<NCOLS; j++){
+                        cout << slope_grid[i][j] << " ";
+                }
+                cout << endl;
+        }
 
-        delete grid;
+        for (i=0; i<NROWS; i++){
+                delete[] grid[i];
+                delete[] slope_grid[i];
+        }
+        delete[] grid;
+        delete[] slope_grid;
+
         return 0;
 }
 
-vector< vector <float> >* loadFile(string filename){
+float** loadFile(string filename){
         //Open file
         ifstream inFile;
         inFile.open(filename.c_str());
@@ -38,14 +59,11 @@ vector< vector <float> >* loadFile(string filename){
                 exit(1);
         }
         
-        float* grid[] = new float*[NROWS];
+        float** grid = new float* [NROWS];
         for(int k=0; k<NROWS; k++){
-                grid[i] = new float[NCOLS];
+                grid[k] = new float [NCOLS];
         }
         
-        
-        //vector < vector < float > >* toReturn = new vector < vector <float> >;
-        //vector < float > temp;
         string line;
         
         int i=0;
@@ -54,29 +72,57 @@ vector< vector <float> >* loadFile(string filename){
         while(getline(inFile, line)){
                 istringstream ss(line);
                 string x;
-                //Copy each token from a line into a vector
+                //Copy each token from a line into a grid
                 while(getline(ss, x, ' ')){
-                        //temp.push_back(atof(x.c_str()));
+                        grid[i][j] = atof(x.c_str());
+                        j++;
                 }
-                //Add vector to grid
-                //toReturn->push_back(temp);
-                //temp.clear();
+                j=0;
+                i++;
         }
-        //for (int i=0; i<1000; i++){
-        //        for (int j=0; j<1000; j++){
-        //                cout << toReturn->at(i)[j] << endl;
-        //        }
-        //}
         inFile.close();
-        //return toReturn;
+        return grid;
 }
 
-vector< vector <float> >* calcSlope(vector< vector <float> >* grid, ncols, nrows, cellsize, NODATA){
-        vector< vector <float> >* slope_grid = new vector< vector <float> >;
+float** calcSlope(float** grid){
+        float** slope_grid = new float* [NROWS];
 
-        for (int row=0; row<nrow; row++){
-                for (int col=0; col<ncol; col++){
-
+        for (int row=0; row<NROWS; row++){
+                slope_grid[row] = new float [NCOLS];
+                for (int col=0; col<NCOLS; col++){
+                        slope_grid[row][col] = cellSlope(grid, row, col);
                 }
         }
+        return slope_grid;
+}
+
+float cellSlope(float** grid, int row, int col){
+        float nbhd[9];
+        int k = 0;
+        for (int i=-1; i<2; i++){
+                for (int j=-1; j<2; j++){
+                        if ((row+i<=0) || (row+i>=NROWS) || (col+j<=0) || (col+j>=NCOLS)){
+                                nbhd[k] = NODATA;
+                        }
+                        else{
+                                nbhd[k] = grid[row+i][col+j];
+                        }
+                        k++;
+                }
+        }
+
+        if (nbhd[4] == NODATA){
+                return nbhd[4];
+        }
+
+        for (k=0; k<9; k++){
+                if (nbhd[k] == NODATA){
+                        nbhd[k] = nbhd[4];
+                }
+        }
+
+        float dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*CELLSIZE);
+        float dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*CELLSIZE);
+
+        return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
 }
