@@ -72,7 +72,7 @@ float** loadFile(string filename){
         while (count < 6)
 	{
 		//read in header line one at a time
-		getline(infile, header[count]);
+		getline(inFile, header[count]);
 		//grab number of cols and make into int variable
 		if (count == 0)
 		{
