@@ -10,14 +10,24 @@ def main():
 	xllcorner = params[2].split()[1]
 	yllcorner = params[3].split()[1]
 	cellsize = float(params[4].split()[1])
-	NODATA = float(params[5].split()[1])
+	NODATA = int(params[5].split()[1])
 
   # read data in as n by m list of numpy floats
 	data = np.loadtxt(open("aigrid.asc"), skiprows=6)
   
 	slope_data = calc_slope(data, cellsize, NODATA)
-  #print slope_data
-  #np.savetxt("output.txt", slope_data, fmt='%5.2f')
+        #set up header
+        header_str = ("ncols %s\n"
+                  "nrows %s\n"
+                  "xllcorner %s\n"
+                  "yllcorner %s\n"
+                  "cellsize %f\n"
+                  "NODATA_value %d"
+                  % (ncols, nrows, xllcorner, yllcorner, cellsize, NODATA)
+                 )
+
+	#print slope_data
+	np.savetxt("output.asc", slope_data, fmt='%5.2f', header=header_str, comments='')
 
 def calc_slope(grid, cellsize, NODATA):
 	slope_grid = np.zeros_like(grid)

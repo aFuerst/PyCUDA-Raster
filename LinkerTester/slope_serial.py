@@ -10,14 +10,25 @@ def main(inputPath, outputPath):
 	xllcorner = params[2].split()[1]
 	yllcorner = params[3].split()[1]
 	cellsize = float(params[4].split()[1])
-	NODATA = float(params[5].split()[1])
+	NODATA = int(params[5].split()[1])
 
 	# read data in as n by m list of numpy floats
 	data = np.loadtxt(open(inputPath), skiprows=6)
   
 	slope_data = calc_slope(data, cellsize, NODATA)
+
+        #set up header
+        header_str = ("ncols %s\n"
+                  "nrows %s\n"
+                  "xllcorner %s\n"
+                  "yllcorner %s\n"
+                  "cellsize %f\n"
+                  "NODATA_value %d"
+                  % (ncols, nrows, xllcorner, yllcorner, cellsize, NODATA)
+                 )
+
 	#print slope_data
-	np.savetxt(outputPath, slope_data, fmt='%5.2f')
+	np.savetxt(outputPath, slope_data, fmt='%5.2f', header=header_str, comments='')
 
 def calc_slope(grid, cellsize, NODATA):
 	slope_grid = np.zeros_like(grid)
@@ -39,7 +50,7 @@ def cell_slope(grid, row, col, cellsize, NODATA):
 			if row+i<=0 or row+i>=len(grid) or col+j<=0 or col+j>=len(grid[0]) or grid[row + i][col +j] == NODATA:
 				nbhd.append(NODATA)
 			else:
-				nbhd.append(grid[row+i,col+j])
+				nbhd.append(grid[row+i][col+j])
 
 	dz_dx = (nbhd[2] + 2*nbhd[5] + nbhd[8] - (nbhd[0] + 2*nbhd[3] + nbhd[6])) \
 				/ (8*cellsize)
