@@ -15,7 +15,7 @@ def main(inputPath, outputPath):
 	# read data in as n by m list of numpy floats
 	data = np.loadtxt(open(inputPath), skiprows=6)
   
-	#slope_data = calc_slope(data, cellsize, NODATA)
+	slope_data = calc_slope(data, cellsize, NODATA)
 	#print slope_data
 	np.savetxt(outputPath, slope_data, fmt='%5.2f')
 
