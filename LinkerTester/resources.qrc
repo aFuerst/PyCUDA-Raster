@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/LinkerTester" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
