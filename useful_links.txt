@@ -3,3 +3,9 @@ http://qgis.org/api/2.8/index.html
 http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/
 
 http://www.qgistutorials.com/en/docs/learning_resources.html
+
+https://github.com/compmem/cutools/blob/master/gpustruct.py
+
+http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
+
+https://documen.tician.de/pycuda/
