@@ -5,9 +5,3 @@ http://docs.qgis.org/testing/en/docs/pyqgis_developer_cookbook/
 http://www.qgistutorials.com/en/docs/learning_resources.html
 
 https://github.com/OSGeo/gdal/blob/trunk/gdal/apps/gdaldem_lib.cpp#L632
-
-https://documen.tician.de/pycuda/
-
-http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
-
-https://github.com/compmem/cutools/blob/master/gpustruct.py
