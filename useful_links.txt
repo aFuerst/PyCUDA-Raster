@@ -9,3 +9,5 @@ https://github.com/compmem/cutools/blob/master/gpustruct.py
 http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
 
 https://documen.tician.de/pycuda/
+
+https://llpanorama.wordpress.com/2008/06/11/threads-and-blocks-and-grids-oh-my/
