@@ -8,46 +8,42 @@
 #include <string>
 #include <sstream>
 #include <math.h>
+#include <vector>
 #include <algorithm>
 #include <iterator>
-#include <vector>
 
-//static const int NCOLS = 1051;
-//static const int NROWS = 1407;
-//static const float CELLSIZE = 10.0;
-//static const float NODATA = -32767.0;
-
+//declaring global variables for # of columns, rows, cell size, and no data value
 int NCOLS, NROWS;
 float CELLSIZE, NODATA;
-string header[6];
 
 using namespace std;
 
-float** loadFile(string filename);
+//function headers
+float** loadFile(string filename, string header[]);
 float** calcSlope(float** grid);
 float cellSlope(float** grid, int row, int col);
+void output(string outputFile,string header[], float** grid);
 
-int main(int argc, char* argv[]){
-        if (argc != 2){
+int main(int argc, char* argv[])
+{
+        if (argc != 3)
+        {
                 cerr << "Incorrect number of args" << endl;
-                cout << "Correct usage: ./slope_serial <filename>" << endl;
+                cout << "Correct usage: ./Slope <input filename> <output filename>" << endl;
                 return 1;
         }
-
+	
         string filename(argv[1]);
-        int i, j;
+	string outputFile(argv[2]);
+	string header[6];
 
-        //TODO: Free grid at end of program
-        float** grid = loadFile(filename);
+        float** grid = loadFile(filename, header);
         float** slope_grid = calcSlope(grid);
-        for (i=0; i<NROWS; i++){
-                for (int j=0; j<NCOLS; j++){
-                        cout << slope_grid[i][j] << " ";
-                }
-                cout << endl;
-        }
+	output(outputFile, header, slope_grid);
 
-        for (i=0; i<NROWS; i++){
+	
+        for (int i=0; i<NROWS; i++)
+        {
                 delete[] grid[i];
                 delete[] slope_grid[i];
         }
@@ -57,69 +53,69 @@ int main(int argc, char* argv[]){
         return 0;
 }
 
-float** loadFile(string filename){
+float** loadFile(string filename, string header[])
+{
         //Open file
         ifstream inFile;
         inFile.open(filename.c_str());
-        if(!inFile.is_open()){
+        if(!inFile.is_open())
+        {
                 cerr << "File failed to open" << endl;
                 exit(1);
         }
         
-        int count = 0;
-        vector<string> splits;
-        
-        while (count < 6)
+	int count = 0;
+	vector<string> keyValues;
+
+	//reading lines of header and saving keyvalues into global variables
+	while (count < 6)
 	{
-		//read in header line one at a time
 		getline(inFile, header[count]);
-		//grab number of cols and make into int variable
-		if (count == 0)
+		if(count == 0)
 		{
-			istringstream stream(header[count]);
-			copy(istream_iterator<string>(stream),
+			istringstream headLine(header[count]);			
+			copy(istream_iterator<string>(headLine),
 				istream_iterator<string>(),
-				back_inserter(splits));
-			NCOLS = stoi(splits[1], nullptr,10);
+				back_inserter(keyValues));
+			NCOLS = atoi(keyValues[1].c_str());
 			count++;
 		}
-		//grab number of rows and make into int variable
-		else if (count == 1)
-		{
-			istringstream stream(header[count]);
-			copy(istream_iterator<string>(stream),
-				istream_iterator<string>(),
-				back_inserter(splits));
-			NROWS = stoi(splits[3], nullptr, 10);
+		else if(count == 1)
+                {
+			istringstream headLine(header[count]);
+                        copy(istream_iterator<string>(headLine),
+                                istream_iterator<string>(),
+                                back_inserter(keyValues));
+                        NROWS = atoi(keyValues[3].c_str());
 			count++;
-		}
-		//grab cell size and maake into float variable
-		else if (count == 4)
-		{
-			istringstream stream(header[count]);
-			copy(istream_iterator<string>(stream),
-				istream_iterator<string>(),
-				back_inserter(splits));
-			CELLSIZE = stof(splits[5]);
+                }
+		else if(count == 4)
+                {
+			istringstream headLine(header[count]);
+                        copy(istream_iterator<string>(headLine),
+                                istream_iterator<string>(),
+                                back_inserter(keyValues));
+                        CELLSIZE = atof(keyValues[5].c_str());
 			count++;
-		}
-		//grab no data value and make into float variable
-		else if (count == 5)
-		{
-			istringstream stream(header[count]);
-			copy(istream_iterator<string>(stream),
-				istream_iterator<string>(),
-				back_inserter(splits));
-			NODATA = stof(splits[7]);
+                }
+		else if(count == 5)
+                {
+			istringstream headLine(header[count]);
+                        copy(istream_iterator<string>(headLine),
+                                istream_iterator<string>(),
+                                back_inserter(keyValues));
+                        NODATA = atof(keyValues[7].c_str());
 			count++;
-		}
-		//go to next line in header
+                }
 		else
-		count++;
+			count++;
 	}
+
 	
-        float** grid = new float* [NROWS];
-        for(int k=0; k<NROWS; k++){
+	
+	float** grid = new float* [NROWS];
+        for(int k=0; k<NROWS; k++)
+        {
                 grid[k] = new float [NCOLS];
         }
         
@@ -128,14 +124,19 @@ float** loadFile(string filename){
         int i=0;
         int j=0;
         //Read file line by line
-        while(getline(inFile, line)){
-                istringstream ss(line);
+        while(getline(inFile, line))
+        {
+		//removing whitespace in the begining of the lines
+                line.erase(line.begin());
+		istringstream ss(line);
                 string x;
+		char trash;
                 //Copy each token from a line into a grid
-                while(getline(ss, x, ' ')){
+                while(getline(ss, x, ' '))
+		{
                         grid[i][j] = atof(x.c_str());
                         j++;
-                }
+          	}
                 j=0;
                 i++;
         }
@@ -143,39 +144,80 @@ float** loadFile(string filename){
         return grid;
 }
 
-float** calcSlope(float** grid){
+//outputing header and calculated slope data to a file
+void output(string outputFile, string header[], float** grid)
+{
+	ofstream outFile;
+	outFile.open(outputFile.c_str());
+	if(!outFile.is_open())
+	{
+		cerr << "File failed to open" << endl;
+		exit(1);
+	}
+	
+	int i, j;
+	
+	for (i = 0; i < 6; i++)
+	{
+		outFile << header[i] << '\n';
+	}
+
+	for (i = 0; i < NROWS; i++)
+	{
+		for (j = 0; j < NCOLS; j++)
+		{
+			outFile << grid[i][j] << " ";
+		}
+		outFile << endl;
+	}
+
+	outFile.close();
+}
+
+float** calcSlope(float** grid)
+{
         float** slope_grid = new float* [NROWS];
 
-        for (int row=0; row<NROWS; row++){
+        for (int row=0; row<NROWS; row++)
+        {
                 slope_grid[row] = new float [NCOLS];
-                for (int col=0; col<NCOLS; col++){
+                for (int col=0; col<NCOLS; col++)
+                {
                         slope_grid[row][col] = cellSlope(grid, row, col);
                 }
         }
         return slope_grid;
 }
 
-float cellSlope(float** grid, int row, int col){
+float cellSlope(float** grid, int row, int col)
+{
         float nbhd[9];
         int k = 0;
-        for (int i=-1; i<2; i++){
-                for (int j=-1; j<2; j++){
-                        if ((row+i<=0) || (row+i>=NROWS) || (col+j<=0) || (col+j>=NCOLS)){
+        for (int i=-1; i<2; i++)
+        {
+                for (int j=-1; j<2; j++)
+                {
+                        if ((row+i<=0) || (row+i>=NROWS) || (col+j<=0) || (col+j>=NCOLS))
+                        {
                                 nbhd[k] = NODATA;
                         }
-                        else{
+                        else
+                        {
                                 nbhd[k] = grid[row+i][col+j];
                         }
                         k++;
                 }
         }
 
-        if (nbhd[4] == NODATA){
+        if (nbhd[4] == NODATA)
+        {
                 return nbhd[4];
         }
 
-        for (k=0; k<9; k++){
-                if (nbhd[k] == NODATA){
+        for (k=0; k<9; k++)
+        {
+                if (nbhd[k] == NODATA)
+                {
                         nbhd[k] = nbhd[4];
                 }
         }
