@@ -4,8 +4,9 @@ from collections import deque
 from time import sleep
 
 """
-Threaded serial slope calculator for ascii raster files.
-Uses producer-consumer paradigm to ensure memory isn't flooded.
+Threaded serial slope calculator for raster ascii files.
+Uses producer-consumer paradigm to handle memory.
+
 Charlie Kazer
 """
 
@@ -33,8 +34,8 @@ def main():
         calc_thread = threading.Thread(target=calc_func, args=(output_file, data_buffer, lock, int(nrows), int(ncols), float(cellsize), float(NODATA)))
 
         #Tell python that if we terminate our program prematurely, terminate threads.
-        load_thread.daemon = True
-        calc_thread.daemon = True
+        #load_thread.daemon = True
+        #calc_thread.daemon = True
 
         #set up header
         header_str = ("ncols %s\n"
@@ -53,8 +54,9 @@ def main():
         calc_thread.start()
 
         #This allows us to ctrl-c out. TODO: is there a more efficient way to do this?
-        while load_thread.isAlive() or calc_thread.isAlive():
-          sleep(0.1)
+        #while load_thread.isAlive() or calc_thread.isAlive():
+        #  sleep(0.1)
+        calc_thread.join()
 
         #clean-up
         input_file.close()
@@ -118,7 +120,6 @@ def calc_func(output_file, data_buffer, lock, numRows, numCols, cellsize, NODATA
     output_file.write(' '.join(cur_slope))
     output_file.write('\n')
     cur_slope = []
-    print "Processed a line %d" % (count)
 
   #Calculate slope for bottom line
   cur_slope = calc_slope_edge(cur_lines, cellsize, NODATA, False)
@@ -126,7 +127,6 @@ def calc_func(output_file, data_buffer, lock, numRows, numCols, cellsize, NODATA
   output_file.write('\n')
   cur_slope = []
 
-  print "about to exit consumer"
 
 
 #////////////////////////////////////////////////////////////////////////////////#
