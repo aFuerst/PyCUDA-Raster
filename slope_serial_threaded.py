@@ -18,14 +18,14 @@ def main():
 	xllcorner = input_file.readline().split()[1]
 	yllcorner = input_file.readline().split()[1]
 	cellsize = float(input_file.readline().split()[1])
-	NODATA = int(input_file.readline().split()[1])
+	NODATA = float(input_file.readline().split()[1])
 
         # NOTE: Don't skip any lines here, the file pointer has already advanced
         # past the header to the data.
 
         #Create lock and data buffer. Choose buffer size appropriate for memory size.
         lock = threading.Condition()
-        data_buffer = deque([], 10000)
+        data_buffer = deque([], 10)
 
         output_file = open("output_slope.asc", 'w')
         
@@ -166,15 +166,17 @@ def calc_slope(cur_lines, cellsize, NODATA):
 
 # calc_slope_edge: wrapper function which appends a NODATA row to the first
 # and last rows of data. Then proceeds to call calc_slope.
+
 def calc_slope_edge(cur_lines, cellsize, NODATA, top):
   new_lines = cur_lines
+  new_row = np.empty_like(new_lines[1])
+  new_row.fill(NODATA)
   if top:
-    new_lines.appendleft(np.empty_like(new_lines).fill(NODATA))
+    new_lines.appendleft(new_row)
     return calc_slope(new_lines, cellsize, NODATA)
   else:
-    new_lines.append(np.empty_like(new_lines).fill(NODATA))
+    new_lines.append(new_row)
     return calc_slope(new_lines, cellsize, NODATA)
-
 #////////////////////////////////////////////////////////////////////////////////#
 
 if __name__ == '__main__':
