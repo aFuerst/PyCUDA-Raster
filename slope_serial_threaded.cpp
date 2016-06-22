@@ -24,7 +24,10 @@ deque<deque <float> > buffer;
 const static int MAX_BUF_SIZE = 10000;
 
 //function headers
-void getHeader(ifstream* inFile, ifstream* outFile, string header[]);
+void getHeader(ifstream* inFile, ofstream* outFile, string header[]);
+void loadData(ifstream* inFile);
+void calcFunc(ofstream* outFile);
+float calc_slope(deque< deque <float> >* cur_lines, int col);
 
 int main(int argc, char* argv[])
 {
@@ -58,13 +61,19 @@ int main(int argc, char* argv[])
 	
         getHeader(&inFile, &outFile, header);
 
+        boost::thread load_thread(loadData, &inFile);
+        boost::thread calc_thread(calcFunc, &outFile);
+
+        load_thread.join();
+        calc_thread.join();
+
         inFile.close();
         outFile.close();
 
         return 0;
 }
 
-void getHeader(ifstream* inFile, ifstream* outFile, string header[])
+void getHeader(ifstream* inFile, ofstream* outFile, string header[])
 {
 	int count = 0;
 	vector<string> keyValues;
@@ -114,18 +123,18 @@ void getHeader(ifstream* inFile, ifstream* outFile, string header[])
 	}
 
         //Write header to output file
-	for (i = 0; i < 6; i++)
+	for (int i = 0; i < 6; i++)
 	{
-		outFile << header[i] << '\n';
+		*outFile << header[i] << '\n';
 	}
 }
 
-void loadData(ifstream inFile){
+void loadData(ifstream* inFile){
         string line;
         deque< float > row;
 
         //Read file line by line
-        while(getline(inFile, line))
+        while(getline(*inFile, line))
         {
 		//removing whitespace in the begining of the lines
                 line.erase(line.begin());
@@ -149,87 +158,84 @@ void loadData(ifstream inFile){
         }
 }
 
-void calcFunc(ifstream outFile){
-    deque< deque <float> > cur_lines;
+void calcFunc(ofstream* outFile){
+    deque< deque <float> >* cur_lines = new deque< deque <float> >;
     int count=0;
+    int i;
     float cur_slope[NCOLS];
 
-    while (count < NROWS){
+    //First push back NODATA row for calculating sloep of first row
+    cur_lines->push_back(deque<float> (NCOLS, NODATA));
+    //Next, grab first two rows of data
+    for(i=0; i<2; i++){
         boost::mutex::scoped_lock lock(buffer_lock);
         while(buffer.size() == 0){
             buffer_available.wait(buffer_lock);
         }
-        outFile << buffer.pop_front().pop_front() << "\n";
+        //DONT pop anything from cur_lines yet, need to fill with three rows.
+        cur_lines->push_back(buffer.front());
+        buffer.pop_front();
+        buffer_available.notify_one();
+        buffer_lock.unlock();
+
         count++;
     }
+    //Calculate and write out first row
+    for(i=0; i<NCOLS; i++){
+        *outFile << calc_slope(cur_lines, i) << " ";
+    }
+    *outFile << "\n";
+
+    //Enter main while loop
+    while (count < NROWS){
+        cur_lines->pop_front();
+        //////////////////////LOCK/////////////////////////
+        boost::mutex::scoped_lock lock(buffer_lock);
+        while(buffer.size() == 0){
+            buffer_available.wait(buffer_lock);
+        }
+        cur_lines->push_back(buffer.front());
+        buffer.pop_front();
+        buffer_available.notify_one();
+        buffer_lock.unlock();
+        ////////////////////UNLOCK/////////////////////////
+        count++;
+        for(i=0; i<NCOLS; i++){
+            *outFile << calc_slope(cur_lines, i) << " ";
+        }
+        *outFile << "\n";
+    }
+
+
+    //Push back another NODATA row to calculate the last row with.
+    cur_lines->pop_front();
+    cur_lines->push_back(deque<float> (NCOLS, NODATA));
+    //Calculate and write out last row
+    for(i=0; i<NCOLS; i++){
+        *outFile << calc_slope(cur_lines, i) << " ";
+    }
+    *outFile << "\n";
 }
 
-/*
-	float** grid = new float* [NROWS];
-        for(int k=0; k<NROWS; k++)
-        {
-                grid[k] = new float [NCOLS];
-        }
-        
-        string line;
-        
-        int i=0;
-        int j=0;
-        //Read file line by line
-        while(getline(inFile, line))
-        {
-		//removing whitespace in the begining of the lines
-                line.erase(line.begin());
-		istringstream ss(line);
-                string x;
-		char trash;
-                //Copy each token from a line into a grid
-                while(getline(ss, x, ' '))
-		{
-                        grid[i][j] = atof(x.c_str());
-                        j++;
-          	}
-                j=0;
-                i++;
-        }
-        inFile.close();
-        return grid;
-*/
-
-
-
-/*
-float cellSlope(float** grid, int row, int col)
+float calc_slope(deque< deque <float> >* cur_lines, int col)
 {
-        float nbhd[9];
-        int k = 0;
-        for (int i=-1; i<2; i++)
-        {
-                for (int j=-1; j<2; j++)
-                {
-                        if ((row+i<=0) || (row+i>=NROWS) || (col+j<=0) || (col+j>=NCOLS))
-                        {
-                                nbhd[k] = NODATA;
-                        }
-                        else
-                        {
-                                nbhd[k] = grid[row+i][col+j];
-                        }
-                        k++;
-                }
+        if (cur_lines->at(1)[col] == NODATA){
+            return NODATA;
         }
 
-        if (nbhd[4] == NODATA)
-        {
-                return nbhd[4];
-        }
-
-        for (k=0; k<9; k++)
-        {
-                if (nbhd[k] == NODATA)
-                {
-                        nbhd[k] = nbhd[4];
+        float nbhd[9];//'neighborhood' of current cell
+        int k=0;
+        
+        for (int i=0; i<3; i++){
+            for (int j=-1; j<2; j++){
+                if ((col+j < 0) or (col+j > NCOLS)){
+                    nbhd[k] = NODATA;
                 }
+                else{
+                    nbhd[k] = cur_lines->at(i)[col+j];
+                }
+                k++;
+            }
         }
 
         float dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*CELLSIZE);
@@ -237,4 +243,3 @@ float cellSlope(float** grid, int row, int col)
 
         return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
 }
-*/
