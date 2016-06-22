@@ -5,7 +5,7 @@ from gpustruct import GPUStruct
 import numpy as np
 
 def run():
-
+    # open ascii layer and read in settings
     input_file = open("aigrid.asc", 'r')
     ncols = np.float64(input_file.readline().split()[1])
     nrows = np.float64(input_file.readline().split()[1])
@@ -14,19 +14,34 @@ def run():
     cellsize = np.float64(input_file.readline().split()[1])
     NODATA = np.float64(input_file.readline().split()[1])
 
-    numberBlocks = 1
-    print "number of blocks:%d" % numberBlocks
 
-    total_pixels = np.float64(ncols * nrows)
-    pixels_per_thread = np.float64(total_pixels / (1024 * numberBlocks))
+    # set up values needed by PyCUDA to launch CUDA kernel function /////////////////#
+    #	grid and block defined here and used at bottom of file
+
+    # number of blocks that CUDA will use
+    grid=(1,1)
+    numberBlocks = grid[1] * grid[0]
+    print "number of blocks:%d" % numberBlocks
+    
+    # how many threads each block will have, in (x,y,z) fashion, max of 1024
+    block = (1024, 1, 1)
+    threads_per_block = block[0] * [1] * [2]
+    
+    # determine how many pixels each thread needs to calculate
+    total_pixels = np.int64(ncols * nrows)
+	# use ceiling to ensure no pixel is left out, ok if some calculate twice
+    pixels_per_thread = np.ceil(total_pixels / (threads_per_block * numberBlocks))
     print "pixels per thread:%d" % pixels_per_thread
 
-    # read data in as n by m list of np floats
+    # done setting up grid and block tuples needed by PyCUDA ////////////////////////#
+    
+    # read data in as an n by m list of numpy floats
     # NOTE: Don't skip any lines here, the file pointer has already advanced
     # past the header to the data.
-	    
     data = np.loadtxt(input_file)
     input_file.close()
+
+    # create 2 numpy arrays of equal size, one with data and one empty
     data = data.astype(np.float64)
     result = np.empty_like(data)
 
@@ -38,6 +53,7 @@ def run():
     cuda.memcpy_htod(data_gpu, data)
     cuda.memcpy_htod(result_gpu, result)
 
+    # create struct to pass information to C code
     stc = GPUStruct([
 	    (np.float64, 'pixels_per_thread', pixels_per_thread),
 	    (np.float64, 'NODATA', NODATA),
@@ -64,10 +80,10 @@ def run():
     } passed_in;
 
     /************************************************************************************************
-	    on-GPU function that gets the neighbors of the pixel at curr_offset
+	    GPU only function that gets the neighbors of the pixel at curr_offset
 	    stores them in the passed-by-reference array 'store'
     ************************************************************************************************/
-    __device__ int getNeighbors(double *store, double *data, unsigned curr_offset, passed_in *file_info){
+    __device__ int getKernel(double *store, double *data, unsigned curr_offset, passed_in *file_info){
 	    int i;
 	    for(i = -1; i < 2; i++){
 		    if((i + curr_offset - file_info -> ncols) < 0){
@@ -89,27 +105,27 @@ def run():
     }
 
     /************************************************************************************************
-	    kernel function to calculate the slope of pixels in 'data' and stores them in 'result'
+	    CUDA Kernel function to calculate the slope of pixels in 'data' and stores them in 'result'
 	    handles a variable number of calculations based on its thread/block location 
-	    and the size of pixels_per_thread
+	    and the size of pixels_per_thread in file_info
 	    
 	    TODO: Create formule to utilize multiple blocks and threads in the y direction
 		    see if these changes are able to increase speed
     ************************************************************************************************/
     __global__ void simple_slope(double *data, double *result, passed_in *file_info){
-	    /* get individual thread x,y coordinates */
-	    /* probably not correct */
+	    /* get individual thread x,y values */
 	    unsigned long x = blockIdx.x * blockDim.x + threadIdx.x* file_info -> pixels_per_thread;
-	    unsigned long y = blockIdx.y * blockDim.y + threadIdx.y;
+	    unsigned long y = blockIdx.y * blockDim.y + threadIdx.y; /* always 0 currently */
 	    unsigned long offset = x + y;
 	    unsigned long i;
-	    /* iterate over assigned pixels and calculate slope for all of them */
+	    /* list to store 3x3 kernel each pixel needs to calc slope */
 	    double nbhd[9];
+	    /* iterate over assigned pixels and calculate slope for all of them */
 	    for(i=offset; i < offset + file_info -> pixels_per_thread && i < file_info -> npixels; ++i){
 		    if(data[i] == file_info -> NODATA){
 			    result[i] = file_info -> NODATA;
 		    } else {
-			    int q = getNeighbors(nbhd, data, i, file_info);
+			    int q = getKernel(nbhd, data, i, file_info);
 			    for(q = 0; q < 9; ++q){
 				    if(nbhd[q] == file_info -> NODATA){
 					    nbhd[q] = data[i];
@@ -125,10 +141,8 @@ def run():
 
     func = mod.get_function("simple_slope")
 
-    # call slope function using a 2x3 grid of blocks which are made up of 16x16x1 threads -> 
-    #func(data_gpu, result_gpu, stc.get_ptr(), block = (1, 1, 1), grid=(1, 1))
-
-    func(data_gpu, result_gpu, stc.get_ptr(), block = (1024, 1, 1), grid=(1,1))
+    # call slope function using a 1x1 grid of blocks which are made up of 1024x1x1 threads -> 
+    func(data_gpu, result_gpu, stc.get_ptr(), block, grid)
 
     # copy result back to host
     cuda.memcpy_dtoh(result, result_gpu)
