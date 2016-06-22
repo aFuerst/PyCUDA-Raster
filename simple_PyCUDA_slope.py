@@ -25,7 +25,7 @@ def run():
     
     # how many threads each block will have, in (x,y,z) fashion, max of 1024
     block = (1024, 1, 1)
-    threads_per_block = block[0] * [1] * [2]
+    threads_per_block = block[0] * block[1] * block[2]
     
     # determine how many pixels each thread needs to calculate
     total_pixels = np.int64(ncols * nrows)
@@ -65,8 +65,7 @@ def run():
     stc.copy_to_gpu()
 
     # function(s) to be compiled by CUDA for execution on GPU
-    mod = SourceModule(
-    """
+    mod = SourceModule("""
     #include <math.h>
     #include <stdio.h>
 
@@ -141,8 +140,8 @@ def run():
 
     func = mod.get_function("simple_slope")
 
-    # call slope function using a 1x1 grid of blocks which are made up of 1024x1x1 threads -> 
-    func(data_gpu, result_gpu, stc.get_ptr(), block, grid)
+    # call slope function using a 1x1 grid of blocks which are made up of 1024x1x1 threads
+    func(data_gpu, result_gpu, stc.get_ptr(), block=block, grid=grid)
 
     # copy result back to host
     cuda.memcpy_dtoh(result, result_gpu)
