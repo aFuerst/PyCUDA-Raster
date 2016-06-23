@@ -14,20 +14,21 @@ using namespace std;
 
 //declaring global variables for # of columns, rows, cell size, and no data value
 int NCOLS, NROWS;
-float CELLSIZE, NODATA;
+double CELLSIZE, NODATA;
 
 //Variables shared between threads
-//NOTE: May need to change to type confition_variable_any
 boost::condition_variable_any buffer_available;
 boost::mutex buffer_lock;
-deque<deque <float> > buffer;
-const static int MAX_BUF_SIZE = 10000;
+deque<deque <double> > buffer;
+const static int MAX_BUF_SIZE = 70000;
 
 //function headers
 void getHeader(ifstream* inFile, ofstream* outFile, string header[]);
 void loadData(ifstream* inFile);
 void calcFunc(ofstream* outFile);
-float calc_slope(deque< deque <float> >* cur_lines, int col);
+double calc_slope(deque< deque <double> >* cur_lines, int col);
+
+
 
 int main(int argc, char* argv[])
 {
@@ -61,9 +62,11 @@ int main(int argc, char* argv[])
 	
         getHeader(&inFile, &outFile, header);
 
+        //start threads
         boost::thread load_thread(loadData, &inFile);
         boost::thread calc_thread(calcFunc, &outFile);
 
+        //wait for thread completion
         load_thread.join();
         calc_thread.join();
 
@@ -73,6 +76,10 @@ int main(int argc, char* argv[])
         return 0;
 }
 
+/* getHeader - Gathers header information from input file, and then
+ *             writes that information to the output file since it will
+ *             be identical.
+ */
 void getHeader(ifstream* inFile, ofstream* outFile, string header[])
 {
 	int count = 0;
@@ -129,9 +136,12 @@ void getHeader(ifstream* inFile, ofstream* outFile, string header[])
 	}
 }
 
+/* loadData - Thread function which loads data into the shared buffer,
+ *            line by line.
+ */
 void loadData(ifstream* inFile){
         string line;
-        deque< float > row;
+        deque< double > row;
 
         //Read file line by line
         while(getline(*inFile, line))
@@ -158,16 +168,21 @@ void loadData(ifstream* inFile){
         }
 }
 
+/* calcFunc - Thread function which consumes data from the shared buffer,
+ *            line by line. Also writes results of calculations to
+ *            output file.
+ */
 void calcFunc(ofstream* outFile){
-    deque< deque <float> >* cur_lines = new deque< deque <float> >;
+    deque< deque <double> >* cur_lines = new deque< deque <double> >;
     int count=0;
     int i;
-    float cur_slope[NCOLS];
+    double cur_slope[NCOLS];
 
     //First push back NODATA row for calculating sloep of first row
-    cur_lines->push_back(deque<float> (NCOLS, NODATA));
+    cur_lines->push_back(deque<double> (NCOLS, NODATA));
     //Next, grab first two rows of data
     for(i=0; i<2; i++){
+        //////////////////////LOCK/////////////////////////
         boost::mutex::scoped_lock lock(buffer_lock);
         while(buffer.size() == 0){
             buffer_available.wait(buffer_lock);
@@ -177,7 +192,7 @@ void calcFunc(ofstream* outFile){
         buffer.pop_front();
         buffer_available.notify_one();
         buffer_lock.unlock();
-
+        ////////////////////UNLOCK/////////////////////////
         count++;
     }
     //Calculate and write out first row
@@ -209,21 +224,28 @@ void calcFunc(ofstream* outFile){
 
     //Push back another NODATA row to calculate the last row with.
     cur_lines->pop_front();
-    cur_lines->push_back(deque<float> (NCOLS, NODATA));
+    cur_lines->push_back(deque<double> (NCOLS, NODATA));
     //Calculate and write out last row
     for(i=0; i<NCOLS; i++){
         *outFile << calc_slope(cur_lines, i) << " ";
     }
     *outFile << "\n";
+
+    delete cur_lines;
 }
 
-float calc_slope(deque< deque <float> >* cur_lines, int col)
+/* calc_slope - calculates the slope for a single cell in a raster
+ *              file. cur_lines includes the input row of the cell, and
+ *              the rows above and below that cell. col is the column
+ *              of the cell we're calculating the slope for.
+ */
+double calc_slope(deque< deque <double> >* cur_lines, int col)
 {
         if (cur_lines->at(1)[col] == NODATA){
             return NODATA;
         }
 
-        float nbhd[9];//'neighborhood' of current cell
+        double nbhd[9];//'neighborhood' of current cell
         int k=0;
         
         for (int i=0; i<3; i++){
@@ -238,8 +260,8 @@ float calc_slope(deque< deque <float> >* cur_lines, int col)
             }
         }
 
-        float dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*CELLSIZE);
-        float dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*CELLSIZE);
+        double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*CELLSIZE);
+        double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*CELLSIZE);
 
         return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
 }
