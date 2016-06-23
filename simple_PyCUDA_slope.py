@@ -7,19 +7,23 @@ import numpy as np
 def run():
     # open ascii layer and read in settings
     input_file = open("aigrid.asc", 'r')
-    ncols = np.float64(input_file.readline().split()[1])
-    nrows = np.float64(input_file.readline().split()[1])
+    ncols = np.int64(input_file.readline().split()[1])
+    nrows = np.int64(input_file.readline().split()[1])
     xllcorner = input_file.readline().split()[1]
     yllcorner = input_file.readline().split()[1]
     cellsize = np.float64(input_file.readline().split()[1])
     NODATA = np.float64(input_file.readline().split()[1])
 
+    totalMem = cuda.mem_get_info()[1]
+    freeMem = cuda.mem_get_info()[0]
+    print "free GPU memory in MB: ", freeMem / (1024  * 1024)
+    print "total GPU memory in MB: ", totalMem / (1024 * 1024)
 
     # set up values needed by PyCUDA to launch CUDA kernel function /////////////////#
     #	grid and block defined here and used at bottom of file
 
     # number of blocks that CUDA will use
-    grid=(1,1)
+    grid=(20 ,1)
     numberBlocks = grid[1] * grid[0]
     print "number of blocks:%d" % numberBlocks
     
@@ -30,7 +34,7 @@ def run():
     # determine how many pixels each thread needs to calculate
     total_pixels = np.int64(ncols * nrows)
 	# use ceiling to ensure no pixel is left out, ok if some calculate twice
-    pixels_per_thread = np.ceil(total_pixels / (threads_per_block * numberBlocks))
+    pixels_per_thread = np.ceil(total_pixels / (threads_per_block * (numberBlocks-1)))
     print "pixels per thread:%d" % pixels_per_thread
 
     # done setting up grid and block tuples needed by PyCUDA ////////////////////////#
@@ -38,11 +42,19 @@ def run():
     # read data in as an n by m list of numpy floats
     # NOTE: Don't skip any lines here, the file pointer has already advanced
     # past the header to the data.
-    data = np.loadtxt(input_file)
+    #data = np.loadtxt(input_file)
+    data = cuda.pagelocked_empty((nrows, ncols), np.float64)
+    
+    for row in range(nrows):
+	temp = input_file.readline().split()
+	for col in range(ncols):
+	  data[row][col] = temp[col]
+    
+    
     input_file.close()
 
     # create 2 numpy arrays of equal size, one with data and one empty
-    data = data.astype(np.float64)
+    #data = data.astype(np.float64)
     result = np.empty_like(data)
 
     # allocate needed data space into GPU
@@ -113,7 +125,7 @@ def run():
     ************************************************************************************************/
     __global__ void simple_slope(double *data, double *result, passed_in *file_info){
 	    /* get individual thread x,y values */
-	    unsigned long x = blockIdx.x * blockDim.x + threadIdx.x* file_info -> pixels_per_thread;
+	    unsigned long x = (blockIdx.x * blockDim.x + threadIdx.x)* file_info -> pixels_per_thread;
 	    unsigned long y = blockIdx.y * blockDim.y + threadIdx.y; /* always 0 currently */
 	    unsigned long offset = x + y;
 	    unsigned long i;
