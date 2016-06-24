@@ -7,8 +7,8 @@ import numpy as np
 def run():
     # open ascii layer and read in settings
     input_file = open("aigrid.asc", 'r')
-    ncols = np.float64(input_file.readline().split()[1])
-    nrows = np.float64(input_file.readline().split()[1])
+    ncols = np.int64(input_file.readline().split()[1])
+    nrows = np.int64(input_file.readline().split()[1])
     xllcorner = input_file.readline().split()[1]
     yllcorner = input_file.readline().split()[1]
     cellsize = np.float64(input_file.readline().split()[1])
@@ -38,7 +38,12 @@ def run():
     # read data in as an n by m list of numpy floats
     # NOTE: Don't skip any lines here, the file pointer has already advanced
     # past the header to the data.
-    data = np.loadtxt(input_file)
+    data = cuda.pagelocked_empty((nrows, ncols), np.float64)
+    
+    for row in range(nrows):
+	temp = input_file.readline().split()
+	for col in range(ncols):
+	  data[row][col] = temp[col]
     input_file.close()
     
     print "data shape: " + str(data.shape)
