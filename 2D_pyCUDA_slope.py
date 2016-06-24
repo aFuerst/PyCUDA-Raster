@@ -19,7 +19,7 @@ def run():
     #	grid and block defined here and used at bottom of file
 
     # number of blocks that CUDA will use
-    grid=(1,1)
+    grid=(3,2)
     numberBlocks = grid[1] * grid[0]
     print "number of blocks:%d" % numberBlocks
     
@@ -132,7 +132,10 @@ def run():
 	    /* list to store 3x3 kernel each pixel needs to calc slope */
 	    double nbhd[9];
 	    /* iterate over assigned pixels and calculate slope for all of them */
-	    for(i=0; i < file_info -> pixels_per_thread; ++i){
+	    for(i=0; i < file_info -> pixels_per_thread + 1; ++i){
+                    if(offset > file_info -> npixels){
+		      break;
+                    }	    
 		    if(data[offset] == file_info -> NODATA){
 			    result[offset] = file_info -> NODATA;
 		    } else {
@@ -153,6 +156,7 @@ def run():
                     }
                     offset += (gridDim.x*blockDim.x) * (gridDim.y*blockDim.y);
                     //Jump to next row
+
             }
     }
     """)
