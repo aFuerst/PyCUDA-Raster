@@ -78,10 +78,13 @@ def calc_func(output_file, data_buffer, numRows, numCols, cellsize, NODATA):
   count = 0
   cur_slope = []
 
-  cur_lines.append(np.zeros(numCols).fill(NODATA))
+  nodata_row = np.zeros(numCols)
+  nodata_row.fill(NODATA)
+
+  cur_lines.append(nodata_row)
   #Read first two lines so that when we enter main while, cur_lines will
   #always contain 3 lines
-  while(len(cur_lines) < 2):
+  while(len(cur_lines) < 3):
     while (data_buffer.empty()):
       sleep(0.1)
     cur_lines.append(data_buffer.get())
@@ -110,7 +113,7 @@ def calc_func(output_file, data_buffer, numRows, numCols, cellsize, NODATA):
     cur_slope = []
 
   #Calculate slope for bottom line
-  cur_lines.append(np.zeros(numCols).fill(NODATA))
+  cur_lines.append(nodata_row)
   for i in range(cur_lines[1].size):
       cur_slope.append(calc_slope(cur_lines, i, cellsize, NODATA))
   output_file.write(' '.join(cur_slope))
