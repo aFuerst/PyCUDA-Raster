@@ -1,3 +1,4 @@
+//To complie type g++ -o executable name file name.cpp -l boost_system -l boost_thread
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
