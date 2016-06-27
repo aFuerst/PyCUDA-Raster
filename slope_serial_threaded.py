@@ -1,5 +1,4 @@
 import numpy as np
-import threading
 from multiprocessing import Process, Queue, Condition
 from collections import deque
 from time import sleep
@@ -28,8 +27,8 @@ def main():
         output_file = open("output_slope.asc", 'w')
         
         #create threads
-        load_proc = threading.Thread(target=load_func, args=(input_file, data_buffer))
-        calc_proc = threading.Thread(target=calc_func, args=(output_file, data_buffer, int(nrows), int(ncols), float(cellsize), float(NODATA)))
+        load_proc = Process(target=load_func, args=(input_file, data_buffer))
+        calc_proc = Process(target=calc_func, args=(output_file, data_buffer, int(nrows), int(ncols), float(cellsize), float(NODATA)))
 
         #set up header
         header_str = ("ncols %s\n"
