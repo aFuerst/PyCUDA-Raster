@@ -61,19 +61,13 @@ def run():
     cuda.memcpy_htod(data_gpu, data)
     cuda.memcpy_htod(result_gpu, result)
 
-    # calculate column width in bytes
-    width = ncols * np.dtype(np.float64).itemsize
-    print "width: " + str(width)
-
     # create struct to pass information to C code
     stc = GPUStruct([
 	    (np.float64, 'pixels_per_thread', pixels_per_thread),
 	    (np.float64, 'NODATA', NODATA),
-            (np.int64, 'width', width),
 	    (np.int64, 'ncols', ncols),
 	    (np.int64, 'nrows', nrows),
 	    (np.int64, 'npixels', ncols*nrows),
-	    (np.int64, 'count', 0)
     ])
     stc.copy_to_gpu()
 
@@ -85,11 +79,9 @@ def run():
     typedef struct{
 	    double pixels_per_thread;
 	    double NODATA;
-            unsigned long width;
 	    long ncols;
 	    long nrows;
 	    long npixels;
-	    long count;
     } passed_in;
 
     /************************************************************************************************
