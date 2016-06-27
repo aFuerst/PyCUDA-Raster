@@ -1,14 +1,26 @@
-#import pycuda.autoinit
-#import pycuda.driver as cuda
-#from pycuda.compiler import SourceModule
 import numpy as np
 from gpustruct import GPUStruct
 from multiprocessing import Process,Condition, Lock
 import memoryInitializer
 
+"""
+TODO: change getHeaderInfo and load_func to work with both tiff and ascii
+      fix illegal memory access in CUDA when dealing with large files
+      deal with python warning in load_func about depreceated statement
+      find way to make calc_func an independent process again
+      re-create file with better class structure
+      deal with boundary cases for calculations happening in GPU, first and last rows have data not being represented
+"""
+
+"""
+Function that takes input and output file paths
+uses python multiprocessing and PyCUDA to efficiently calculate the slope and write results to output_file
+currently only works with ascii files
+"""
 def run(input_file, output_file):
   
-  ncols, nrows, cellsize, NODATA, xllcorner, yllcorner = getColsRows(input_file)
+  # get header data
+  ncols, nrows, cellsize, NODATA, xllcorner, yllcorner = getHeaderInfo(input_file)
   
   mem = memoryInitializer.memoryInitializer(ncols, nrows)
   
@@ -37,6 +49,10 @@ def run(input_file, output_file):
   
   print "Processing completed"
   
+"""
+function that takes an input file path and a memoryInitializer object as parameters
+opens the file and fills the to_gpu_buffer in mem, loops over this until file has been completely processed
+"""
 def load_func(input_file, mem):
   f = open(input_file)
   # skip over header
@@ -62,11 +78,15 @@ def load_func(input_file, mem):
     # Notify that page is full
     mem.to_gpu_buffer_full.set()
     mem.to_gpu_buffer_lock.notify()
-    
     mem.to_gpu_buffer_lock.release()
      
   print "entire file loaded"
 
+"""
+Moves data in mem shared data buffer onto the GPU and runs slope calculation on it
+Once done moves data back to host and a separate shared buffer
+Uses Locks and Events to maintain threading saftey
+"""
 def calc_func(mem, nrows, ncols, cellsize, NODATA):
   import pycuda.driver as cuda
   from pycuda.compiler import SourceModule
@@ -211,6 +231,10 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
     
   print "done computing on gpu"
 
+"""
+Takes data from shared buffer in mem and writes it to disk
+when all done releases lock on array and waits for it to be filled again
+"""
 def write_func(output_file, header, mem, nrows):
   f = open(output_file, 'w')
   f.write(header)
@@ -236,7 +260,11 @@ def write_func(output_file, header, mem, nrows):
     
   print "done writing to file"
 
-def getColsRows(file):
+"""
+Opens file and returns all the header information about it
+Also closes the file once information is grabbed
+"""
+def getHeaderInfo(file):
   f = open(file, 'r')
   ncols = np.int64(f.readline().split()[1])
   nrows = np.int64(f.readline().split()[1])
@@ -249,4 +277,4 @@ def getColsRows(file):
 
 
 if __name__ == '__main__':
-  run("aigrid.asc", "output.asc")
+ run("calvert.asc", "output.asc")
