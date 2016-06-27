@@ -4,7 +4,7 @@ from collections import deque
 from time import sleep
 
 """
-Threaded serial slope calculator for raster ascii files.
+"Threaded" (actually processes) serial slope calculator for raster ascii files.
 Uses producer-consumer paradigm to handle memory.
 
 Charlie Kazer
@@ -16,9 +16,10 @@ def main():
         output_file = open("output_slope.asc", 'w')
 
         #Create data buffer, conditions. Choose buffer size appropriate for memory size.
+        #This process queue will handle locking automatically.
         data_buffer = Queue(maxsize=10000)
 
-        #create threads
+        #create processes
         load_proc = Process(target=load_func, args=(input_file, data_buffer))
         calc_proc = Process(target=calc_func, args=(output_file, data_buffer))
 
@@ -32,6 +33,7 @@ def main():
 # load_func: Produces data from input file
 def load_func(input_file, data_buffer):
 
+  #Load file statistics data into buffer
   #////////////////////////////////////////////////////////////////////#
   ncols = input_file.readline().split()[1]
   nrows = input_file.readline().split()[1]
@@ -49,8 +51,6 @@ def load_func(input_file, data_buffer):
   #////////////////////////////////////////////////////////////////////#
 
   for line in input_file:
-    # NOTE: Don't skip any lines here, the file pointer has already advanced
-    # past the header to the data.
     data_buffer.put(np.fromstring(line, sep=' '))
   data_buffer.close()
   input_file.close()
@@ -60,6 +60,8 @@ def load_func(input_file, data_buffer):
 # calc_func: Consumes data from shared buffer. Calls calc_slope to handle actual calculations
 # Writes results to output file.
 def calc_func(output_file, data_buffer):
+
+  #Get file statistics data from buffer, write back to output
   #////////////////////////////////////////////////////////////////////#
   numCols = data_buffer.get()
   numRows = data_buffer.get()
@@ -85,9 +87,9 @@ def calc_func(output_file, data_buffer):
   count = 0
   cur_slope = []
 
+  #First, insert a NODATA row
   nodata_row = np.zeros(numCols)
   nodata_row.fill(NODATA)
-
   cur_lines.append(nodata_row)
   #Read first two lines so that when we enter main while, cur_lines will
   #always contain 3 lines
@@ -113,7 +115,7 @@ def calc_func(output_file, data_buffer):
     output_file.write('\n')
     cur_slope = []
 
-  #Calculate slope for bottom line
+  #Calculate slope for bottom line, add another NODATA row
   cur_lines.append(nodata_row)
   for i in range(cur_lines[1].size):
       cur_slope.append(calc_slope(cur_lines, i, cellsize, NODATA))
