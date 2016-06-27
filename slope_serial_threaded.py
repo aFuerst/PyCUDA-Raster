@@ -13,66 +13,74 @@ Charlie Kazer
 def main():
 
 	input_file = open("aigrid.asc", 'r')
-	ncols = input_file.readline().split()[1]
-	nrows = input_file.readline().split()[1]
-	xllcorner = input_file.readline().split()[1]
-	yllcorner = input_file.readline().split()[1]
-	cellsize = float(input_file.readline().split()[1])
-	NODATA = float(input_file.readline().split()[1])
-
+        output_file = open("output_slope.asc", 'w')
 
         #Create data buffer, conditions. Choose buffer size appropriate for memory size.
         data_buffer = Queue(maxsize=10000)
 
-        output_file = open("output_slope.asc", 'w')
-        
         #create threads
         load_proc = Process(target=load_func, args=(input_file, data_buffer))
-        calc_proc = Process(target=calc_func, args=(output_file, data_buffer, int(nrows), int(ncols), float(cellsize), float(NODATA)))
+        calc_proc = Process(target=calc_func, args=(output_file, data_buffer))
 
-        #set up header
-        header_str = ("ncols %s\n"
-                  "nrows %s\n"
-                  "xllcorner %s\n"
-                  "yllcorner %s\n"
-                  "cellsize %f\n"
-                  "NODATA_value %d\n"
-                  % (ncols, nrows, xllcorner, yllcorner, cellsize, NODATA)
-                 )
-
-        output_file.write(header_str)
-
-        #spin up header
         load_proc.start()
         calc_proc.start()
 
         calc_proc.join()
 
-        #clean-up
-        input_file.close()
-        output_file.close()
-
-
 #////////////////////////////////////////////////////////////////////////////////#
 
 # load_func: Produces data from input file
 def load_func(input_file, data_buffer):
+
+  #////////////////////////////////////////////////////////////////////#
+  ncols = input_file.readline().split()[1]
+  nrows = input_file.readline().split()[1]
+  xllcorner = input_file.readline().split()[1]
+  yllcorner = input_file.readline().split()[1]
+  cellsize = float(input_file.readline().split()[1])
+  NODATA = float(input_file.readline().split()[1])
+
+  data_buffer.put(int(ncols))
+  data_buffer.put(int(nrows))
+  data_buffer.put(float(xllcorner))
+  data_buffer.put(float(yllcorner))
+  data_buffer.put(float(cellsize))
+  data_buffer.put(float(NODATA))
+  #////////////////////////////////////////////////////////////////////#
+
   for line in input_file:
     # NOTE: Don't skip any lines here, the file pointer has already advanced
     # past the header to the data.
-    while (data_buffer.full()):
-      #So inefficient... But in order to get proper waiting, would need to introduce lock
-      sleep(0.1)
-      #print "loader waiting..."
-      
     data_buffer.put(np.fromstring(line, sep=' '))
-
+  data_buffer.close()
+  input_file.close()
 
 #////////////////////////////////////////////////////////////////////////////////#
 
 # calc_func: Consumes data from shared buffer. Calls calc_slope to handle actual calculations
 # Writes results to output file.
-def calc_func(output_file, data_buffer, numRows, numCols, cellsize, NODATA):
+def calc_func(output_file, data_buffer):
+  #////////////////////////////////////////////////////////////////////#
+  numCols = data_buffer.get()
+  numRows = data_buffer.get()
+  xllcorner = data_buffer.get()
+  yllcorner = data_buffer.get()
+  cellsize = data_buffer.get()
+  NODATA = data_buffer.get()
+
+  #set up header
+  header_str = ("ncols %d\n"
+            "nrows %d\n"
+            "xllcorner %f\n"
+            "yllcorner %f\n"
+            "cellsize %f\n"
+            "NODATA_value %f\n"
+            % (numCols, numRows, xllcorner, yllcorner, cellsize, NODATA)
+            )
+
+  output_file.write(header_str)
+  #////////////////////////////////////////////////////////////////////#
+
   cur_lines = deque([], 3)
   count = 0
   cur_slope = []
@@ -84,8 +92,6 @@ def calc_func(output_file, data_buffer, numRows, numCols, cellsize, NODATA):
   #Read first two lines so that when we enter main while, cur_lines will
   #always contain 3 lines
   while(len(cur_lines) < 3):
-    while (data_buffer.empty()):
-      sleep(0.1)
     cur_lines.append(data_buffer.get())
     count += 1
 
@@ -98,10 +104,6 @@ def calc_func(output_file, data_buffer, numRows, numCols, cellsize, NODATA):
 
   #Main loop
   while (count < numRows):
-    while (data_buffer.empty()):
-      sleep(0.1)
-      #print "waiting consumer..."
-
     cur_lines.append(data_buffer.get())
     count += 1
 
@@ -119,7 +121,7 @@ def calc_func(output_file, data_buffer, numRows, numCols, cellsize, NODATA):
   output_file.write('\n')
   cur_slope = []
 
-
+  output_file.close()
 
 #////////////////////////////////////////////////////////////////////////////////#
 
