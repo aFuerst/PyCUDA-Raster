@@ -77,76 +77,90 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
   #device = self.ctx.get_device()
   
   mod = SourceModule("""
-    #include <math.h>
-    #include <stdio.h>
+  #include <math.h>
+  #include <stdio.h>
 
-    typedef struct{
-	    double pixels_per_thread;
-	    double NODATA;
-	    long ncols;
-	    long nrows;
-	    long npixels;
-    } passed_in;
+  typedef struct{
+          double pixels_per_thread;
+          double NODATA;
+          long ncols;
+          long nrows;
+          long npixels;
+  } passed_in;
 
-    /************************************************************************************************
-	    GPU only function that gets the neighbors of the pixel at curr_offset
-	    stores them in the passed-by-reference array 'store'
-    ************************************************************************************************/
-    __device__ int getKernel(double *store, double *data, unsigned curr_offset, passed_in *file_info){
-	    int i;
-	    for(i = -1; i < 2; i++){
-		    if((i + curr_offset - file_info -> ncols) < 0){
-		      store[i + 1] = data[curr_offset];
-		    } else {
-		      store[i + 1] = data[i + curr_offset - (int)(file_info -> ncols)];
-		    }
-		    
-		    store[i + 4] = data[i + curr_offset];
-		    
-		    if((i + curr_offset + file_info -> ncols) > file_info -> npixels){
-		      store[i + 7] = data[i + curr_offset + (int)(file_info -> ncols)];
-		    } else {
-		      store[i + 7] = data[curr_offset];
-		    }
-	    }
-	    /* return a value otherwise it throws a warning expression not having effect */
-	    return i;
-    }
+  /************************************************************************************************
+          GPU only function that gets the neighbors of the pixel at curr_offset
+          stores them in the passed-by-reference array 'store'
+  ************************************************************************************************/
+  __device__ int getKernel(double *store, double *data, unsigned long offset, passed_in *file_info){
+          //NOTE: This is more or less appropriated from Liam's code. Treats edge rows and columns
+          // as buffers, they will be dropped.
+          if (offset < file_info->ncols || offset >= (file_info->npixels - file_info->ncols)){
+                return 1;
+          }
+          unsigned long y = offset % file_info->ncols; //FIXME: I'm not sure why this works...
+          if (y == (file_info->ncols - 1) || y == 0){
+                return 1;
+          }
+          // Grab neighbors above and below.
+          store[1] = data[offset - file_info->ncols];
+          store[7] = data[offset + file_info->ncols];
+          // Grab right side neighbors.
+          store[2] = data[offset - file_info->ncols + 1];
+          store[5] = data[offset + 1];
+          store[8] = data[offset + file_info->ncols + 1];
+          // Grab left side neighbors.
+          store[0] = data[offset - file_info->ncols - 1];
+          store[3] = data[offset - 1];
+          store[6] = data[offset + file_info->ncols - 1];
+          /* return a value otherwise it throws a warning expression not having effect */
+          return 0;
+  }
 
-    /************************************************************************************************
-	    CUDA Kernel function to calculate the slope of pixels in 'data' and stores them in 'result'
-	    handles a variable number of calculations based on its thread/block location 
-	    and the size of pixels_per_thread in file_info
-	    
-	    TODO: Create formule to utilize multiple blocks and threads in the y direction
-		    see if these changes are able to increase speed
-    ************************************************************************************************/
-    __global__ void simple_slope(double *data, double *result, passed_in *file_info){
-	    /* get individual thread x,y values */
-	    unsigned long x = (blockIdx.x * blockDim.x + threadIdx.x)* file_info -> pixels_per_thread;
-	    unsigned long y = blockIdx.y * blockDim.y + threadIdx.y; /* always 0 currently */
-	    unsigned long offset = x + y;
-	    unsigned long i;
-	    /* list to store 3x3 kernel each pixel needs to calc slope */
-	    double nbhd[9];
-	    /* iterate over assigned pixels and calculate slope for all of them */
-	    for(i=offset; i < offset + file_info -> pixels_per_thread && i < file_info -> npixels; ++i){
-		    if(data[i] == file_info -> NODATA){
-			    result[i] = file_info -> NODATA;
-		    } else {
-			    int q = getKernel(nbhd, data, i, file_info);
-			    for(q = 0; q < 9; ++q){
-				    if(nbhd[q] == file_info -> NODATA){
-					    nbhd[q] = data[i];
-				    }
-			    }
-			    double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*10);
-			    double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*10);
-			    result[i] = atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
-		    }
-	    }
-    }
-    """)
+  /************************************************************************************************
+          CUDA Kernel function to calculate the slope of pixels in 'data' and stores them in 'result'
+          handles a variable number of calculations based on its thread/block location 
+          and the size of pixels_per_thread in file_info
+  ************************************************************************************************/
+  __global__ void simple_slope(double *data, double *result, passed_in *file_info){
+          /* get individual thread x,y values */
+          unsigned long x = blockIdx.x * blockDim.x + threadIdx.x;
+          unsigned long y = blockIdx.y * blockDim.y + threadIdx.y; 
+          unsigned long offset = (gridDim.x*blockDim.x) * y + x; 
+          //gridDim.x * blockDim.x is the width of the grid in threads. This moves us to the correct
+          //block and thread.
+          unsigned long i;
+          /* list to store 3x3 kernel each pixel needs to calc slope */
+          double nbhd[9];
+          /* iterate over assigned pixels and calculate slope for all of them */
+          for(i=0; i < file_info -> pixels_per_thread + 1; ++i){
+                  if(offset > file_info -> npixels){
+                    break;
+                  }	    
+                  if(data[offset] == file_info -> NODATA){
+                          result[offset] = file_info -> NODATA;
+                  } else {
+                          int q = getKernel(nbhd, data, offset, file_info);
+                          if (q) {
+                                result[offset] = file_info->NODATA;
+                          }
+                          else{
+                                for(q = 0; q < 9; ++q){
+                                        if(nbhd[q] == file_info -> NODATA){
+                                                nbhd[q] = data[offset];
+                                        }
+                                }
+                                double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*10);
+                                double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*10);
+                                result[offset] = atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
+                          }
+                  }
+                  offset += (gridDim.x*blockDim.x) * (gridDim.y*blockDim.y);
+                  //Jump to next row
+
+          }
+  }
+  """)
   
   func = mod.get_function("simple_slope")
   decrement = mem.totalRows
@@ -216,9 +230,11 @@ def write_func(output_file, header, mem, nrows):
       
     for row in mem.from_gpu_buffer:
       for col in row:
+        print col
 	f.write(str(col))
 	f.write(' ')
       f.write('\n')
+      print " "
     
     f.flush()
     nrows-=len(mem.from_gpu_buffer)
