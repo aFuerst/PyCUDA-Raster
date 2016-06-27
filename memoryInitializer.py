@@ -3,7 +3,7 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 from gpustruct import GPUStruct
 import numpy as np
-from multiprocessing import Condition
+from multiprocessing import Condition, Event
 
 """
 provides automatic allocation of available memory based on file size to be computed
@@ -17,6 +17,11 @@ class memoryInitializer:
   allocated memory will be a multiple of the maximum number of rows that can be computed at once
   """
   def __init__(self, totalCols, totalRows):
+    cuda.init()
+    self.ctx = cuda.Device(0).make_context()
+    self.device = self.ctx.get_device()
+    
+    
     self.totalCols = totalCols
     self.totalRows = totalRows
     
@@ -31,14 +36,18 @@ class memoryInitializer:
     # multiply totalCols times 8 to fit with using 64 bit floats 
     self.maxPossRows = np.int(np.floor(gpu_buffer_size / (8 * totalCols)))
     
+    # set max rows to smaller number to save memory usage
+    if self.totalRows < self.maxPossRows:
+      self.maxPossRows = self.totalRows
+    
     # allocate host memory to use to transfer data to GPU and create thread-safe locks for them
     self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , totalCols), np.float64)
     self.to_gpu_buffer_lock = Condition()
-    self.to_gpu_buffer_full = False
+    self.to_gpu_buffer_full = Event()
     
     self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , totalCols), np.float64)
     self.from_gpu_buffer_lock = Condition()
-    self.from_gpu_buffer_full = False
+    self.from_gpu_buffer_full = Event()
     
     self.freeMem = cuda.mem_get_info()[0]
     self.totalMem = cuda.mem_get_info()[1]
@@ -75,7 +84,7 @@ class memoryInitializer:
     cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
   
   # cpoies the data from the GPU to from_gpu_buffer and returns it
-  def getfromGPU(self):
+  def getFromGPU(self):
     cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
     #return self.from_gpu_buffer
   
@@ -86,4 +95,4 @@ class memoryInitializer:
   
   # executes function call 'func' on data_gpu and result_gpu and other parameters passed in
   def funcCall(self, func, struct, block, grid):
-      func(data_gpu, result_gpu, struct.get_ptr(), block=block, grid=grid)
+      func(self.data_gpu, self.result_gpu, struct.get_ptr(), block=block, grid=grid)

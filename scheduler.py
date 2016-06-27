@@ -1,6 +1,6 @@
-import pycuda.autoinit
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+#import pycuda.autoinit
+#import pycuda.driver as cuda
+#from pycuda.compiler import SourceModule
 import numpy as np
 from gpustruct import GPUStruct
 from multiprocessing import Process,Condition, Lock
@@ -11,9 +11,9 @@ def run(input_file, output_file):
   ncols, nrows, cellsize, NODATA, xllcorner, yllcorner = getColsRows(input_file)
   
   mem = memoryInitializer.memoryInitializer(ncols, nrows)
-  
-  load_proc = Process(target=load_func, args=(input_file, mem.to_gpu_buffer, mem.to_gpu_buffer_lock, mem.to_gpu_buffer_full, mem.maxPossRows))
-  calc_proc = Process(target=calc_func, args=(output_file, mem, np.int64(nrows), np.int64(ncols), np.float64(cellsize), np.float64(NODATA)))
+
+  load_proc = Process(target=load_func, args=(input_file, mem))
+  #calc_proc = Process(target=calc_func, args=(mem, np.int64(nrows), np.int64(ncols), np.float64(cellsize), np.float64(NODATA)))
   
   header_str = ("ncols %s\n"
                 "nrows %s\n"
@@ -24,43 +24,58 @@ def run(input_file, output_file):
                 % (ncols, nrows, xllcorner, yllcorner, cellsize, NODATA)
                )
   
-  write_proc = Process(target=write_func, args=(output_file, header_str, mem.from_gpu_buffer, mem.from_gpu_buffer_lock, mem.from_gpu_buffer_full, nrows))
+  write_proc = Process(target=write_func, args=(output_file, header_str, mem, nrows))
   
   load_proc.start()
-  calc_proc.start()
+  #calc_proc.start()
   write_proc.start()
   
+  calc_func(mem, np.int64(nrows), np.int64(ncols), np.float64(cellsize), np.float64(NODATA))
+  
+  load_proc.join()  
   write_proc.join()
-
-
-def load_func(input_file, to_gpu_buffer, to_gpu_buffer_lock, to_gpu_buffer_full, maxPossRows):
+  
+  print "Processing completed"
+  
+def load_func(input_file, mem):
   f = open(input_file)
   # skip over header
   for i in range(6):
     f.readline()
-    
-  for line in f:
-    
-    to_gpu_buffer_lock.acquire()
-    while(to_gpu_buffer_full):
-      to_gpu_buffer_lock.wait()
+ 
+  cur_line = ' ' #current input line
+  while cur_line != '':
+    mem.to_gpu_buffer_lock.acquire()
+    #Wait until page is emptied
+    while mem.to_gpu_buffer_full.is_set():
+      #print "waiting", mem.to_gpu_buffer_full
+      mem.to_gpu_buffer_lock.wait()
       
-      
-    # fill buffer with data
-    for row in range(len(to_gpu_buffer)):
-      rw = np.float64(line.split())
-      for col in range(len(to_gpu_buffer[0])):
-	to_gpu_buffer[row][col] = rw[col]
-    
-    to_gpu_buffer_full = True
-    to_gpu_buffer_lock.notify()
-    
-    to_gpu_buffer_lock.release()
-	
-	
+    #Grab a page worth of input data
+    for row in range(mem.maxPossRows):
+      cur_line = f.readline()
+      if cur_line == '':
+	break
+      cur_line = np.float64(cur_line.split())
+      for col in range(len(mem.to_gpu_buffer[row])):
+	mem.to_gpu_buffer[row][col] = cur_line[col]
 
-def calc_func(output_file, mem, nrows, ncols, cellsize, NODATA):
-   
+    #Notify that page is full
+    mem.to_gpu_buffer_full.set()
+    mem.to_gpu_buffer_lock.notify()
+    
+    mem.to_gpu_buffer_lock.release()
+     
+  print "entire file loaded"
+
+def calc_func(mem, nrows, ncols, cellsize, NODATA):
+  import pycuda.driver as cuda
+  from pycuda.compiler import SourceModule
+  
+  #cuda.init()
+  #ctx = cuda.Device(0).make_context()
+  #device = self.ctx.get_device()
+  
   mod = SourceModule("""
     #include <math.h>
     #include <stdio.h>
@@ -134,8 +149,12 @@ def calc_func(output_file, mem, nrows, ncols, cellsize, NODATA):
     """)
   
   func = mod.get_function("simple_slope")
-  
-  while(True):
+  decrement = mem.totalRows
+  while(decrement > 0):
+    print decrement
+    decrement-=nrows
+    
+    print "here"
     grid=(4, 4)
     block = (32, 32, 1) 
     num_blocks = grid[0] * grid[1]
@@ -144,6 +163,7 @@ def calc_func(output_file, mem, nrows, ncols, cellsize, NODATA):
     #print "pixels per thread:%d" % pixels_per_thread
     
     # create struct to pass information to C code
+    
     stc = GPUStruct([
       (np.float64, 'pixels_per_thread', pixels_per_thread),
       (np.float64, 'NODATA', NODATA),
@@ -152,57 +172,62 @@ def calc_func(output_file, mem, nrows, ncols, cellsize, NODATA):
       (np.int64, 'npixels', ncols*nrows),
       ])
     stc.copy_to_gpu()
-  
+
     mem.to_gpu_buffer_lock.acquire()
-    while(not mem.togpu_buffer_full):
+    while(not mem.to_gpu_buffer_full.is_set()):
+      #print "waitin 2", mem.to_gpu_buffer_full
       mem.to_gpu_buffer_lock.wait()
     
     mem.moveToGPU()
     
     # relase lock on buffer
-    mem.to_gpu_buffer_full = False
-    mem.to_gpu_buffer_lock.notify()
+    mem.to_gpu_buffer_full.clear()
+    mem.to_gpu_buffer_lock.notify_all()
     mem.to_gpu_buffer_lock.release()
     
-
+    print "done calculations"
     
     mem.funcCall(func, stc, block, grid)
     
-    mem.from_gpu_buffer_Lock.acquire()
-    while(mem.from_gpu_buffer_full):
-      mem.from_gpu_buffer_Lock.wait()
+    mem.from_gpu_buffer_lock.acquire()
+    while(mem.from_gpu_buffer_full.is_set()):
+      mem.from_gpu_buffer_lock.wait()
       
+     
     mem.getFromGPU()
     
-    mem.from_gpu_buffer_full = True
-    mem.from_gpu_buffer_Lock.notify()
-    mem.from_gpu_buffer_Lock.release()
+    print "data returned from GPU"
     
-  
+    mem.from_gpu_buffer_full.set()
+    mem.from_gpu_buffer_lock.notify()
+    mem.from_gpu_buffer_lock.release()
+    
+  print "done computing on gpu"
 
-def write_func(output_file, header, from_gpu_buffer, from_gpu_buffer_lock, from_gpu_buffer_full, nrows):
+def write_func(output_file, header, mem, nrows):
   f = open(output_file, 'w')
   f.write(header)
   
   while nrows > 0:
     
-    from_gpu_buffer_lock.acquire()
-    while not from_gpu_buffer_full:
-      from_gpu_buffer_lock.wait()
+    mem.from_gpu_buffer_lock.acquire()
+    while not mem.from_gpu_buffer_full.is_set():
+      mem.from_gpu_buffer_lock.wait()
       
-    for row in from_gpu_buffer:
+    for row in mem.from_gpu_buffer:
       for col in row:
-	f.write(col)
+	f.write(str(col))
 	f.write(' ')
       f.write('\n')
     
     f.flush()
-    nrows-=len(from_gpu_buffer)
+    nrows-=len(mem.from_gpu_buffer)
 
-    from_gpu_buffer_full = False
-    from_gpu_buffer_lock.notify()
-    from_gpu_buffer_lock.release()
+    mem.from_gpu_buffer_full.clear()
+    mem.from_gpu_buffer_lock.notify()
+    mem.from_gpu_buffer_lock.release()
     
+  print "done writing to file"
 
 def getColsRows(file):
   f = open(file, 'r')
