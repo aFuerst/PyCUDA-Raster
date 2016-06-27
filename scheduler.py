@@ -11,9 +11,6 @@ def run(input_file, output_file):
   ncols, nrows, cellsize, NODATA, xllcorner, yllcorner = getColsRows(input_file)
   
   mem = memoryInitializer.memoryInitializer(ncols, nrows)
-
-  load_proc = Process(target=load_func, args=(input_file, mem))
-  #calc_proc = Process(target=calc_func, args=(mem, np.int64(nrows), np.int64(ncols), np.float64(cellsize), np.float64(NODATA)))
   
   header_str = ("ncols %s\n"
                 "nrows %s\n"
@@ -24,12 +21,15 @@ def run(input_file, output_file):
                 % (ncols, nrows, xllcorner, yllcorner, cellsize, NODATA)
                )
   
+  # create two processes to load and write data
+  load_proc = Process(target=load_func, args=(input_file, mem))
   write_proc = Process(target=write_func, args=(output_file, header_str, mem, nrows))
   
+  # start all processes
   load_proc.start()
-  #calc_proc.start()
   write_proc.start()
   
+  # run function to calculate in main to maintain context
   calc_func(mem, np.int64(nrows), np.int64(ncols), np.float64(cellsize), np.float64(NODATA))
   
   load_proc.join()  
@@ -43,15 +43,14 @@ def load_func(input_file, mem):
   for i in range(6):
     f.readline()
  
-  cur_line = ' ' #current input line
+  cur_line = ' ' # current input line
   while cur_line != '':
     mem.to_gpu_buffer_lock.acquire()
-    #Wait until page is emptied
+    # Wait until page is emptied
     while mem.to_gpu_buffer_full.is_set():
-      #print "waiting", mem.to_gpu_buffer_full
       mem.to_gpu_buffer_lock.wait()
       
-    #Grab a page worth of input data
+    # Grab a page worth of input data
     for row in range(mem.maxPossRows):
       cur_line = f.readline()
       if cur_line == '':
@@ -60,7 +59,7 @@ def load_func(input_file, mem):
       for col in range(len(mem.to_gpu_buffer[row])):
 	mem.to_gpu_buffer[row][col] = cur_line[col]
 
-    #Notify that page is full
+    # Notify that page is full
     mem.to_gpu_buffer_full.set()
     mem.to_gpu_buffer_lock.notify()
     
@@ -71,11 +70,8 @@ def load_func(input_file, mem):
 def calc_func(mem, nrows, ncols, cellsize, NODATA):
   import pycuda.driver as cuda
   from pycuda.compiler import SourceModule
-  
-  #cuda.init()
-  #ctx = cuda.Device(0).make_context()
-  #device = self.ctx.get_device()
-  
+
+  # C code to be executed on GPU
   mod = SourceModule("""
   #include <math.h>
   #include <stdio.h>
@@ -163,21 +159,20 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
   """)
   
   func = mod.get_function("simple_slope")
+  
+  # counter to keep tack of how many time to run calculation
   decrement = mem.totalRows
   while(decrement > 0):
-    print decrement
     decrement-=nrows
     
-    print "here"
+    # generate grib and block layout for threads
     grid=(4, 4)
     block = (32, 32, 1) 
     num_blocks = grid[0] * grid[1]
     threads_per_block = block[0] * block[1] * block[2]
     pixels_per_thread = np.ceil((nrows * ncols) / (threads_per_block * num_blocks))
-    #print "pixels per thread:%d" % pixels_per_thread
     
     # create struct to pass information to C code
-    
     stc = GPUStruct([
       (np.float64, 'pixels_per_thread', pixels_per_thread),
       (np.float64, 'NODATA', NODATA),
@@ -187,9 +182,9 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
       ])
     stc.copy_to_gpu()
 
+    # wait until buffer is full
     mem.to_gpu_buffer_lock.acquire()
     while(not mem.to_gpu_buffer_full.is_set()):
-      #print "waitin 2", mem.to_gpu_buffer_full
       mem.to_gpu_buffer_lock.wait()
     
     mem.moveToGPU()
@@ -199,18 +194,16 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
     mem.to_gpu_buffer_lock.notify_all()
     mem.to_gpu_buffer_lock.release()
     
-    print "done calculations"
-    
+    # make call to CUDA to run GPU 
     mem.funcCall(func, stc, block, grid)
     
+    # wait until buffer is empty
     mem.from_gpu_buffer_lock.acquire()
     while(mem.from_gpu_buffer_full.is_set()):
       mem.from_gpu_buffer_lock.wait()
       
-     
+    # get data off GPU and put into RAM buffer
     mem.getFromGPU()
-    
-    print "data returned from GPU"
     
     mem.from_gpu_buffer_full.set()
     mem.from_gpu_buffer_lock.notify()
@@ -230,11 +223,9 @@ def write_func(output_file, header, mem, nrows):
       
     for row in mem.from_gpu_buffer:
       for col in row:
-        print col
 	f.write(str(col))
 	f.write(' ')
       f.write('\n')
-      print " "
     
     f.flush()
     nrows-=len(mem.from_gpu_buffer)

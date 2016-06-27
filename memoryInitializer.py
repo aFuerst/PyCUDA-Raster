@@ -1,6 +1,5 @@
 import pycuda.driver as cuda
-#import pycuda.autoinit
-from pycuda.compiler import SourceModule
+import pycuda.autoinit
 from gpustruct import GPUStruct
 import numpy as np
 from multiprocessing import Condition, Event
@@ -17,11 +16,6 @@ class memoryInitializer:
   allocated memory will be a multiple of the maximum number of rows that can be computed at once
   """
   def __init__(self, totalCols, totalRows):
-    cuda.init()
-    self.ctx = cuda.Device(0).make_context()
-    self.device = self.ctx.get_device()
-    
-    
     self.totalCols = totalCols
     self.totalRows = totalRows
     
