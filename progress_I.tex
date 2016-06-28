@@ -41,7 +41,6 @@
 %%*************************************************************************
 
 %command to make pretty c++
-\newcommand\CC{C\nolinebreak[4]\hspace{-.05em}\raisebox{.4ex}{\relsize{-3}{\textbf{++}}}}
 
 \documentclass[journal,onecolumn]{IEEEtran}
 %
@@ -452,11 +451,12 @@ scalable improvement over similar serial calculations
 \subsection{Related Work}
 Similar work on creating open source, accessible parallel GIS tools has been
 done in the past, though no one method has been widely adopted. The authors of
-\cite{guan} created a \CC library for parallel raster file processing, though
+\cite{guan} created a C++ library for parallel raster file processing, though
 this only uses CPU parallelization. \cite{benedicic} created a GRASS GIS module
-based on cluster computing designed to predict radio-coverage.  \cite{liam}
-developed a \CC library for simple raster calculations using CUDA as an
-extension to the proprietary ArcGIS software.
+based on cluster computing designed to predict radio-coverage.  \cite{hpc_cuda}
+developed a C++ library for simple raster calculations using CUDA as an
+extension to the proprietary ArcGIS software. We want to progress the work
+of \cite{hpc_cuda} to be more accessible to the GIS community.
 
 \section{Problem Outline}
 GIS analytics perform many independent calculations on extremely large data
@@ -491,13 +491,24 @@ write their own computation kernel.
 \section{Analysis}
 
 \section{Conclusion}
+We have developed a PyCUDA based, open source raster calculation plugin for
+QGIS. The plugin ensures that neither memory on the host device or GPU will be
+overpopulated, and utilizes multithreading so that I/O and GPU computation can
+occur simultaneously. Our initial results indicate that our implementation
+competes closely with the standard serial C++ implementation of raster
+algorithms used by QGIS on small files, and may surpass it on large files.  It
+is our hope that since QGIS is a popular freeware GIS, that our plugin will be
+widely adopted and modified by the community to fit various specific needs.
 
 \section{Future Work}
-Our primary goal is to fully develop the plugin and publish it to QGIS so members of the community
-can start to use it and get some feedback. Secondly, the plugin only supports calculating slope 
-and accepts input and output in the form of ESRI ascii format. This represents a problem as 
-this format requires significantly more disk space for storage. We hope to expand this support
-to GEOTIFF files or another common format.
+Our primary goal is to fully develop the plugin and publish it to QGIS so
+members of the community can start to use it and customize it for themselves.
+Secondly, the plugin only supports calculating slope and accepts input and
+output in the form of ESRI ascii format. This represents a problem as this
+format requires significantly more disk space for storage. We hope to expand
+this support to GEOTIFF files or another common format. Additionally, our file
+I/O currently only uses some bare-bones optimizations. We would like to
+investigate different I/O schemes to see what is optimal.
 
 % Can use something like this to put references on a page
 % by themselves when using endfloat and the captionsoff option.
