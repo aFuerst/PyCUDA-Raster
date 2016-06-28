@@ -489,6 +489,19 @@ I/O components to run independent of the central algorithm so that anyone can
 write their own computation kernel.
 
 \section{Analysis}
+Timing our implementation for parallel slope calculation from a raster file against the standard 
+serial method used in QGIS has revealed the input and output will be our biggest  hurdle to 
+overcome. Testing with a 23 megabyte (MB) data file our implementation completed on 
+average in nine seconds while the QGIS method finishes on average five seconds. Moving to a 200 
+megabyte (MB) file the time difference increased with QGIS completing in 15 seconds and our
+version finishing in 51 seconds. Through testing these files though the calculation time on our version 
+appears almost immediately after reading the file while calculations in QGIS are noticeably taking time
+to complete. Moving on to even larger file sizes, in the gigabyte (GB) range, is where conflicts 
+arose. The next file size up was a 3.1 gigabyte (GB) file and our implementation failed with an 
+illegal memory access. The same happened with the largest test file we have, which is 8 gigabytes (GB).
+These files do finish in QGIS in 10 minutes and 27 minutes respectively. This failure is most likely 
+the result of running out of memory on our GPU and something to correct in the future along 
+with optimizing input and output for max efficiency.
 
 \section{Conclusion}
 We have developed a PyCUDA based, open source raster calculation plugin for
