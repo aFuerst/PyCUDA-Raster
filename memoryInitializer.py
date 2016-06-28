@@ -23,7 +23,7 @@ class memoryInitializer:
     self.freeMem = cuda.mem_get_info()[0]
     self.totalMem = cuda.mem_get_info()[1]
     
-    print self.freeMem / (1024*1024), self.totalMem / (1024*1024)
+    print "Free memory (in MB) : ", self.freeMem / (1024*1024), "\n Total memory (in MB) :", self.totalMem / (1024*1024)
     
     # determine how many full rows can fit on device with available memory
     gpu_buffer_size = self.freeMem * .5 * .8
@@ -45,9 +45,8 @@ class memoryInitializer:
     
     self.freeMem = cuda.mem_get_info()[0]
     self.totalMem = cuda.mem_get_info()[1]
-    
-    print self.freeMem / (1024*1024), self.totalMem / (1024*1024)
-    print self.to_gpu_buffer.nbytes  / (1024*1024), self.from_gpu_buffer.nbytes / (1024*1024)
+
+    print "Size of buffers (in MB) : ", self.to_gpu_buffer.nbytes / (1024*1024)
     # allocate device memory 
     self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
     self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
@@ -59,7 +58,8 @@ class memoryInitializer:
   """
   frees all allocated memory on host and GPU
   """
-  def __del__(self):
+    
+  def free(self):
     self.to_gpu_buffer.free()
     self.from_gpu_buffer.free()
     self.data_gpu.free()

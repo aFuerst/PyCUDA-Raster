@@ -2,11 +2,11 @@ import numpy as np
 from gpustruct import GPUStruct
 from multiprocessing import Process,Condition, Lock
 import memoryInitializer
+from pycuda.driver import LogicError
 
 """
 TODO: change getHeaderInfo and load_func to work with both tiff and ascii
       fix illegal memory access in CUDA when dealing with large files
-      deal with python warning in load_func about depreceated statement
       find way to make calc_func an independent process again
       re-create file with better class structure
       deal with boundary cases for calculations happening in GPU, first and last rows have data not being represented
@@ -41,9 +41,13 @@ def run(input_file, output_file):
   load_proc.start()
   write_proc.start()
   
-  # run function to calculate in main to maintain context
-  calc_func(mem, np.int64(nrows), np.int64(ncols), np.float64(cellsize), np.float64(NODATA))
-  
+  try:
+    # run function to calculate in main to maintain context
+    calc_func(mem, np.int64(nrows), np.int64(ncols), np.float64(cellsize), np.float64(NODATA))
+  except LogicError as e:
+    print "run failed, freeing memory"
+    print e
+    mem.free()
   load_proc.join()  
   write_proc.join()
   
@@ -59,8 +63,9 @@ def load_func(input_file, mem):
   for i in range(6):
     f.readline()
  
-  cur_line = ' ' # current input line
-  while cur_line != '':
+  count = mem.totalRows
+  while count > 0:
+    count -= mem.maxPossRows
     mem.to_gpu_buffer_lock.acquire()
     # Wait until page is emptied
     while mem.to_gpu_buffer_full.is_set():
@@ -149,10 +154,8 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
           /* list to store 3x3 kernel each pixel needs to calc slope */
           double nbhd[9];
           /* iterate over assigned pixels and calculate slope for all of them */
-          for(i=0; i < file_info -> pixels_per_thread + 1; ++i){
-                  if(offset > file_info -> npixels){
-                    break;
-                  }	    
+          /* do npixels + 1 to make last row(s) get done */
+          for(i=0; i < file_info -> pixels_per_thread + 1 && offset < file_info -> npixels; ++i){	    
                   if(data[offset] == file_info -> NODATA){
                           result[offset] = file_info -> NODATA;
                   } else {
@@ -277,4 +280,4 @@ def getHeaderInfo(file):
 
 
 if __name__ == '__main__':
- run("calvert.asc", "output.asc")
+ run("aigrid.asc", "output.asc")
