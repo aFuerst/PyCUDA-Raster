@@ -29,12 +29,12 @@ def run(input_file, output_file):
                 "xllcorner %s\n"
                 "yllcorner %s\n"
                 "cellsize %f\n"
-                "NODATA_value %d\n"
+                "NODATA_value %f\n"
                 % (ncols, nrows, xllcorner, yllcorner, cellsize, NODATA)
                )
   print header_str
   # create two processes to load and write data
-  load_proc = Process(target=load_func, args=(input_file, mem))
+  load_proc = Process(target=load_func, args=(input_file, mem, NODATA))
   write_proc = Process(target=write_func, args=(output_file, header_str, mem, nrows))
   
   # start all processes
@@ -57,33 +57,47 @@ def run(input_file, output_file):
 function that takes an input file path and a memoryInitializer object as parameters
 opens the file and fills the to_gpu_buffer in mem, loops over this until file has been completely processed
 """
-def load_func(input_file, mem):
+def load_func(input_file, mem, NODATA):
   f = open(input_file)
   # skip over header
   for i in range(6):
     f.readline()
 
   count = mem.totalRows
+  prev_last_row = np.zeros(mem.totalCols)
+  prev_last_row.fill(NODATA)
   while count > 0:
-    count -= mem.maxPossRows
     mem.to_gpu_buffer_lock.acquire()
     # Wait until page is emptied
     while mem.to_gpu_buffer_full.is_set():
       mem.to_gpu_buffer_lock.wait()
 
+    # Insert previous first row
+    for col in range(len(mem.to_gpu_buffer[0])):
+      mem.to_gpu_buffer[0][col] = prev_last_row[col]
+
     # Grab a page worth of input data
-    for row in range(mem.maxPossRows):
+    for row in range(1, mem.maxPossRows):
       cur_line = f.readline()
+
+      #Reached end of file
       if cur_line == '':
+        #insert NODATA buffer row
+        if row < mem.maxPossRows - 1:
+          for col in range(len(mem.to_gpu_buffer[row])):
+            mem.to_gpu_buffer[row][col] = NODATA
 	break
+
       cur_line = np.float64(cur_line.split())
       for col in range(len(mem.to_gpu_buffer[row])):
 	mem.to_gpu_buffer[row][col] = cur_line[col]
 
+    prev_last_row = cur_line
     # Notify that page is full
     mem.to_gpu_buffer_full.set()
     mem.to_gpu_buffer_lock.notify()
     mem.to_gpu_buffer_lock.release()
+    count -= mem.maxPossRows
 
   print "entire file loaded"
 
@@ -285,4 +299,4 @@ def getHeaderInfo(file):
   return ncols, nrows, cellsize, NODATA, xllcorner, yllcorner
 
 if __name__ == '__main__':
- run("calvert.asc", "output.asc")
+ run("aigrid.asc", "output.asc")
