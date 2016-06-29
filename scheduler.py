@@ -64,35 +64,43 @@ def load_func(input_file, mem, NODATA):
     f.readline()
 
   count = mem.totalRows
+  cur_line = []
   prev_last_row = np.zeros(mem.totalCols)
   prev_last_row.fill(NODATA)
   while count > 0:
     mem.to_gpu_buffer_lock.acquire()
+
     # Wait until page is emptied
     while mem.to_gpu_buffer_full.is_set():
       mem.to_gpu_buffer_lock.wait()
 
-    # Insert previous first row
+    #Insert previous last row as first row in this iteration
     for col in range(len(mem.to_gpu_buffer[0])):
       mem.to_gpu_buffer[0][col] = prev_last_row[col]
 
     # Grab a page worth of input data
-    for row in range(1, mem.maxPossRows):
-      cur_line = f.readline()
+    for row in range(mem.maxPossRows):
+      cur_str = f.readline()
 
       #Reached end of file
-      if cur_line == '':
-        #insert NODATA buffer row
-        if row < mem.maxPossRows - 1:
+      if cur_str == '':
+        #fill rest with NODATA
+        #if row < mem.maxPossRows - 1:
+        #  for col in range(len(mem.to_gpu_buffer[row])):
+        #    mem.to_gpu_buffer[row][col] = NODATA
+	#break
+
+        while row < mem.maxPossRows:
           for col in range(len(mem.to_gpu_buffer[row])):
             mem.to_gpu_buffer[row][col] = NODATA
-	break
+          row += 1
+        break
 
-      cur_line = np.float64(cur_line.split())
+      cur_line = np.float64(cur_str.split())
       for col in range(len(mem.to_gpu_buffer[row])):
 	mem.to_gpu_buffer[row][col] = cur_line[col]
 
-    prev_last_row = cur_line
+    prev_last_row = cur_line.copy()
     # Notify that page is full
     mem.to_gpu_buffer_full.set()
     mem.to_gpu_buffer_lock.notify()
@@ -268,8 +276,8 @@ def write_func(output_file, header, mem, nrows):
     while not mem.from_gpu_buffer_full.is_set():
       mem.from_gpu_buffer_lock.wait()
       
-    for row in mem.from_gpu_buffer:
-      for col in row:
+    for row in range(1, len(mem.from_gpu_buffer)-1):
+      for col in mem.from_gpu_buffer[row]:
 	f.write(str(col))
 	f.write(' ')
       f.write('\n')
