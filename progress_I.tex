@@ -458,8 +458,8 @@ of \cite{hpc_cuda} to be more accessible to the GIS community.
 
 \section{Problem Outline}
 GIS analytics perform many independent calculations on extremely large data
-files. This poses the significant issues of memory limitations and time to
-complete. Data files typically analyzed by GIS now can be in the terabyte (TB)
+files. This poses the significant issues of memory limitations and completion
+time. Data files typically analyzed by GIS now can be in the terabyte (TB)
 size realm. With most computers only having memory capabilities in the gigabyte
 (GB) range, steps need to be taken to work around running out of memory. Both
 the large size of files the requirement that each piece of data be analyzed
@@ -472,8 +472,8 @@ calculations to minimize computation time.
 
 \section{Methods}
 Our implementation of this plugin utilizes parallelism both on the GPU and its
-host computer. It contains a kernel written in C that the CUDA compiler will
-use when it comes time to perform calculations on the  GPU. This kernel will be
+host computer. It contains a kernel written in CUDA C that the CUDA compiler
+executes in order to perform calculations on the  GPU. This kernel will be
 executed by thousands of CUDA threads each tasked with calculating a certain
 number of pixels. This is surrounded by Python code that performs the needed
 set up and removal of data. This Python / PyCUDA code is itself running in a
@@ -497,12 +497,12 @@ finishing in 51 seconds. While testing these files, we noticed that calculation
 time on for the PyCUDA version appears to be instantaneous after reading the
 file into memory, while calculations in QGIS are noticeably taking time to
 complete. Moving on to even larger file sizes, in the GB range, is where
-conflicts arose. While testing  a 3.1 GB file, the PyCUDA implementation failed
-with an illegal memory access. The same happened with a larger 8 GB file.
-These files do finish in QGIS in 10 minutes and 27 minutes respectively. This
-failure is most likely the result of running out of memory on our GPU,
-something we are currently working to correct, along with optimizing input and
-output.
+conflicts arose. While testing  a 3.1 GB file, the PyCUDA implementation completed
+in 11 minutes, only a minute slower than QGIS. A simmilar occurence happened with
+a larger 8 GB file, with the PyCUDA taking 15 minutes more than QGIS. These times
+are very encouraging, showing that Python code is aproaching equal times with QGIS.
+We are confident that these times can be lowered as we work to fix bugs in our
+current codebase and explore options to optimize our current algorithms.
 
 \section{Conclusion}
 We have developed a PyCUDA based, open source raster calculation plugin for
