@@ -35,9 +35,9 @@ class memoryInitializer:
       print "reducing max rows to fit on GPU"
       self.maxPossRows = self.totalRows
     
-    if self.maxPossRows > 1000:
-      self.maxPossRows = 1000
-      print "reducing max rows to: ", self.maxPossRows
+    #if self.maxPossRows > 1000:
+    #  self.maxPossRows = 1000
+    #  print "reducing max rows to: ", self.maxPossRows
     
     # allocate host memory to use to transfer data to GPU and create thread-safe locks for them
     self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , totalCols), np.float64)
