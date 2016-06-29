@@ -32,7 +32,12 @@ class memoryInitializer:
     
     # set max rows to smaller number to save memory usage
     if self.totalRows < self.maxPossRows:
+      print "reducing max rows to fit on GPU"
       self.maxPossRows = self.totalRows
+    
+    if self.maxPossRows > 1000:
+      self.maxPossRows = 1000
+      print "reducing max rows to: ", self.maxPossRows
     
     # allocate host memory to use to transfer data to GPU and create thread-safe locks for them
     self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , totalCols), np.float64)
@@ -46,7 +51,10 @@ class memoryInitializer:
     self.freeMem = cuda.mem_get_info()[0]
     self.totalMem = cuda.mem_get_info()[1]
 
-    print "Size of buffers (in MB) : ", self.to_gpu_buffer.nbytes / (1024*1024)
+    print "Size of buffers (in MB) : ", self.to_gpu_buffer.nbytes / (1024*1024), self.from_gpu_buffer.nbytes / (1024*1024)
+    if self.to_gpu_buffer.nbytes != self.from_gpu_buffer.nbytes:
+      print "ERROR BUFFERS NOT SAME SIZE"
+    
     # allocate device memory 
     self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
     self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
@@ -60,8 +68,8 @@ class memoryInitializer:
   """
     
   def free(self):
-    self.to_gpu_buffer.free()
-    self.from_gpu_buffer.free()
+    #self.to_gpu_buffer.free()
+    #self.from_gpu_buffer.free()
     self.data_gpu.free()
     self.result_gpu.free()
   

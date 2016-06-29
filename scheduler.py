@@ -32,7 +32,7 @@ def run(input_file, output_file):
                 "NODATA_value %d\n"
                 % (ncols, nrows, xllcorner, yllcorner, cellsize, NODATA)
                )
-  
+  print header_str
   # create two processes to load and write data
   load_proc = Process(target=load_func, args=(input_file, mem))
   write_proc = Process(target=write_func, args=(output_file, header_str, mem, nrows))
@@ -50,9 +50,9 @@ def run(input_file, output_file):
     mem.free()
   load_proc.join()  
   write_proc.join()
-  
+
   print "Processing completed"
-  
+
 """
 function that takes an input file path and a memoryInitializer object as parameters
 opens the file and fills the to_gpu_buffer in mem, loops over this until file has been completely processed
@@ -62,7 +62,7 @@ def load_func(input_file, mem):
   # skip over header
   for i in range(6):
     f.readline()
- 
+
   count = mem.totalRows
   while count > 0:
     count -= mem.maxPossRows
@@ -70,7 +70,7 @@ def load_func(input_file, mem):
     # Wait until page is emptied
     while mem.to_gpu_buffer_full.is_set():
       mem.to_gpu_buffer_lock.wait()
-      
+
     # Grab a page worth of input data
     for row in range(mem.maxPossRows):
       cur_line = f.readline()
@@ -84,7 +84,7 @@ def load_func(input_file, mem):
     mem.to_gpu_buffer_full.set()
     mem.to_gpu_buffer_lock.notify()
     mem.to_gpu_buffer_lock.release()
-     
+
   print "entire file loaded"
 
 """
@@ -104,9 +104,9 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
   typedef struct{
           double pixels_per_thread;
           double NODATA;
-          long ncols;
-          long nrows;
-          long npixels;
+          unsigned long long ncols;
+          unsigned long long nrows;
+          unsigned long long npixels;
   } passed_in;
 
   /************************************************************************************************
@@ -145,12 +145,12 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
   ************************************************************************************************/
   __global__ void simple_slope(double *data, double *result, passed_in *file_info){
           /* get individual thread x,y values */
-          unsigned long x = blockIdx.x * blockDim.x + threadIdx.x;
-          unsigned long y = blockIdx.y * blockDim.y + threadIdx.y; 
-          unsigned long offset = (gridDim.x*blockDim.x) * y + x; 
+          unsigned long long x = blockIdx.x * blockDim.x + threadIdx.x;
+          unsigned long long y = blockIdx.y * blockDim.y + threadIdx.y; 
+          unsigned long long offset = (gridDim.x*blockDim.x) * y + x; 
           //gridDim.x * blockDim.x is the width of the grid in threads. This moves us to the correct
           //block and thread.
-          unsigned long i;
+          unsigned long long i;
           /* list to store 3x3 kernel each pixel needs to calc slope */
           double nbhd[9];
           /* iterate over assigned pixels and calculate slope for all of them */
@@ -180,28 +180,28 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
           }
   }
   """)
-  
+
   func = mod.get_function("simple_slope")
-  
+
   # counter to keep tack of how many time to run calculation
   decrement = mem.totalRows
   while(decrement > 0):
-    decrement-=nrows
-    
+    decrement-=mem.maxPossRows
+
     # generate grib and block layout for threads
     grid=(4, 4)
     block = (32, 32, 1) 
     num_blocks = grid[0] * grid[1]
     threads_per_block = block[0] * block[1] * block[2]
-    pixels_per_thread = np.ceil((nrows * ncols) / (threads_per_block * num_blocks))
-    
+    pixels_per_thread = np.ceil((mem.maxPossRows * ncols) / (threads_per_block * num_blocks))
+
     # create struct to pass information to C code
     stc = GPUStruct([
       (np.float64, 'pixels_per_thread', pixels_per_thread),
       (np.float64, 'NODATA', NODATA),
-      (np.int64, 'ncols', ncols),
-      (np.int64, 'nrows', nrows),
-      (np.int64, 'npixels', ncols*nrows),
+      (np.uint64, 'ncols', ncols),
+      (np.uint64, 'nrows', mem.maxPossRows),
+      (np.uint64, 'npixels', mem.maxPossRows*nrows),
       ])
     stc.copy_to_gpu()
 
@@ -209,25 +209,31 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
     mem.to_gpu_buffer_lock.acquire()
     while(not mem.to_gpu_buffer_full.is_set()):
       mem.to_gpu_buffer_lock.wait()
-    
+
     mem.moveToGPU()
     
+    print "moved to gpu"
+
     # relase lock on buffer
     mem.to_gpu_buffer_full.clear()
     mem.to_gpu_buffer_lock.notify_all()
     mem.to_gpu_buffer_lock.release()
-    
+
     # make call to CUDA to run GPU 
     mem.funcCall(func, stc, block, grid)
-    
+
+    print "done calc on gpu"
+
     # wait until buffer is empty
     mem.from_gpu_buffer_lock.acquire()
     while(mem.from_gpu_buffer_full.is_set()):
       mem.from_gpu_buffer_lock.wait()
-      
+
     # get data off GPU and put into RAM buffer
     mem.getFromGPU()
-    
+
+    print "moved from gpu"
+
     mem.from_gpu_buffer_full.set()
     mem.from_gpu_buffer_lock.notify()
     mem.from_gpu_buffer_lock.release()
@@ -278,6 +284,5 @@ def getHeaderInfo(file):
   f.close()
   return ncols, nrows, cellsize, NODATA, xllcorner, yllcorner
 
-
 if __name__ == '__main__':
- run("aigrid.asc", "output.asc")
+ run("calvert.asc", "output.asc")
