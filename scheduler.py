@@ -63,7 +63,8 @@ def load_func(input_file, mem, NODATA):
     f.readline()
 
   count = mem.totalRows
-  cur_line = []
+  cur_line = np.zeros(mem.totalCols)
+  cur_line.fill(NODATA)
   prev_last_row = np.zeros(mem.totalCols)
   prev_last_row.fill(NODATA)
   while count > 0:
@@ -73,9 +74,11 @@ def load_func(input_file, mem, NODATA):
     while mem.to_gpu_buffer_full.is_set():
       mem.to_gpu_buffer_lock.wait()
 
-    #Insert previous last row as first row in this iteration
+    #Insert last 2 rows of last iteration as first two in this iteration
     for col in range(len(mem.to_gpu_buffer[0])):
       mem.to_gpu_buffer[0][col] = prev_last_row[col]
+    for col in range(len(mem.to_gpu_buffer[1])):
+      mem.to_gpu_buffer[1][col] = cur_line[col]
 
     # Grab a page worth of input data
     for row in range(mem.maxPossRows):
@@ -90,11 +93,11 @@ def load_func(input_file, mem, NODATA):
           row += 1
         break
 
+      prev_last_row = cur_line.copy()
       cur_line = np.float64(cur_str.split())
-      for col in range(len(mem.to_gpu_buffer[row])):
-	      mem.to_gpu_buffer[row][col] = cur_line[col]
+      for col in range(2, len(mem.to_gpu_buffer[row])):
+        mem.to_gpu_buffer[row][col] = cur_line[col]
 
-    prev_last_row = cur_line.copy()
     # Notify that page is full
     mem.to_gpu_buffer_full.set()
     mem.to_gpu_buffer_lock.notify()
@@ -275,17 +278,11 @@ def write_func(output_file, header, mem, nrows):
     mem.from_gpu_buffer_lock.acquire()
     while not mem.from_gpu_buffer_full.is_set():
       mem.from_gpu_buffer_lock.wait()
-      
-    for row in range(1, len(mem.from_gpu_buffer)-1):
-      for col in mem.from_gpu_buffer[row]:
-	f.write(str(col))
-	f.write(' ')
-      f.write('\n')
-    
+
     ln=""
     count=0
     #Want to ignore buffer rows
-    for row in range(1, len(mem.from_gpu_buffer)-1):
+    for row in range(len(mem.from_gpu_buffer)):
       for col in mem.from_gpu_buffer[row]:
         ln+=str(col)
         ln+=' '
@@ -296,6 +293,9 @@ def write_func(output_file, header, mem, nrows):
         f.write(ln)
         ln=""
     
+    if count <= 15:
+        f.write(ln)
+
     f.flush()  
     nrows-=len(mem.from_gpu_buffer)
 
@@ -322,4 +322,4 @@ def getHeaderInfo(file):
   return ncols, nrows, cellsize, NODATA, xllcorner, yllcorner
 
 if __name__ == '__main__':
- run("calvert.asc", "output.asc")
+ run("alldem.asc", "output.asc")
