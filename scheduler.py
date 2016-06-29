@@ -6,10 +6,9 @@ from pycuda.driver import LogicError
 
 """
 TODO: change getHeaderInfo and load_func to work with both tiff and ascii
-      fix illegal memory access in CUDA when dealing with large files
       find way to make calc_func an independent process again
       re-create file with better class structure
-      deal with boundary cases for calculations happening in GPU, first and last rows have data not being represented
+      last row of each page still may not be output
 """
 
 """
@@ -85,11 +84,6 @@ def load_func(input_file, mem, NODATA):
       #Reached end of file
       if cur_str == '':
         #fill rest with NODATA
-        #if row < mem.maxPossRows - 1:
-        #  for col in range(len(mem.to_gpu_buffer[row])):
-        #    mem.to_gpu_buffer[row][col] = NODATA
-	#break
-
         while row < mem.maxPossRows:
           for col in range(len(mem.to_gpu_buffer[row])):
             mem.to_gpu_buffer[row][col] = NODATA
@@ -98,7 +92,7 @@ def load_func(input_file, mem, NODATA):
 
       cur_line = np.float64(cur_str.split())
       for col in range(len(mem.to_gpu_buffer[row])):
-	mem.to_gpu_buffer[row][col] = cur_line[col]
+	      mem.to_gpu_buffer[row][col] = cur_line[col]
 
     prev_last_row = cur_line.copy()
     # Notify that page is full
@@ -267,6 +261,12 @@ Takes data from shared buffer in mem and writes it to disk
 when all done releases lock on array and waits for it to be filled again
 """
 def write_func(output_file, header, mem, nrows):
+  from os.path import exists
+  from os import remove
+  if exists(output_file):
+    print "File exists, deleting it"
+    remove(output_file)
+  
   f = open(output_file, 'w')
   f.write(header)
   
@@ -282,13 +282,28 @@ def write_func(output_file, header, mem, nrows):
 	f.write(' ')
       f.write('\n')
     
-    f.flush()
+    ln=""
+    count=0
+    #Want to ignore buffer rows
+    for row in range(1, len(mem.from_gpu_buffer)-1):
+      for col in mem.from_gpu_buffer[row]:
+        ln+=str(col)
+        ln+=' '
+      ln+='\n'
+      count+=1
+      if count > 15:
+        count=0
+        f.write(ln)
+        ln=""
+    
+    f.flush()  
     nrows-=len(mem.from_gpu_buffer)
 
     mem.from_gpu_buffer_full.clear()
     mem.from_gpu_buffer_lock.notify()
     mem.from_gpu_buffer_lock.release()
-    
+
+  f.close()
   print "done writing to file"
 
 """
@@ -307,4 +322,4 @@ def getHeaderInfo(file):
   return ncols, nrows, cellsize, NODATA, xllcorner, yllcorner
 
 if __name__ == '__main__':
- run("aigrid.asc", "output.asc")
+ run("calvert.asc", "output.asc")
