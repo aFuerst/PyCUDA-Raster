@@ -8,6 +8,7 @@ from pycuda.compiler import SourceModule
 class GPUCalculator(Process):
   
     def __init__(self, header, _inputPipe, _outputPipe):
+        Process.__init__(self)
         self.inputPipe = _inputPipe
         self.outputPipe = _outputPipe 
 
@@ -26,13 +27,23 @@ class GPUCalculator(Process):
             self.maxPossRows = self.totalRows
 
         #Allocate space for data in main memory and GPU memory
+        #Use pagelocked buffers for efficiency purposes
         self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
         self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
         self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
         self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
 
+        #carry over rows used to insert last two lines of data from one page
+        #as first two lines in next page
         self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
 
+    """
+    run
+
+    Overrides default Process.run()
+    Given a kernel type, retrieves the C code for that kernel, and runs the
+    data processing loop
+    """
     def run(self, kernelType='simple slope'):
         #Process data while we continue to receive input
         while self.recv_data():
@@ -42,6 +53,16 @@ class GPUCalculator(Process):
         self.process_data(self.get_kernel(kernelType))
         self.write_data()
 
+
+    """
+    recv_data
+
+    Receives a page worth of data from the input pipe. The input pipe comes
+    from dataLoader.py. Copies over 2 rows from the previous page so the GPU 
+    kernel computation works correctly.
+    If the pipe closes, fill the rest of the page with NODATA, and return false
+    to indicate that we should break out of the processing loop.
+    """
     def recv_data(self):
         #insert carry over rows from last page
         for col in range(self.totalCols):
@@ -52,10 +73,13 @@ class GPUCalculator(Process):
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
             try:
-                cur_row = self.input_pipe.recv()
+                cur_row = self.inputPipe.recv()
                 for col in range(self.totalCols):
                     self.to_gpu_buffer[row_count][col] = cur_row[col]
+
+            #Pipe was closed, no more input data
             except EOFError:
+                #Fill rest of page with NODATA
                 while row_count < self.maxPossRows:
                     for col in range(self.totalCols):
                         self.to_gpu_buffer[row_count][col] = self.NODATA
@@ -70,6 +94,14 @@ class GPUCalculator(Process):
 
         return True
 
+
+    """
+    process_data
+
+    Using the given kernel code packed in mod, allocates memory on the GPU,
+    copies input data from a pagelocked buffer, runs the kernel and copies 
+    the output to a second pagelocked buffer
+    """
     def process_data(self, mod):
 
         #GPU layout information
@@ -85,18 +117,46 @@ class GPUCalculator(Process):
             (np.float64, 'NODATA', self.NODATA),
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
-            (np.uint64, 'npixels', self.maxPossRows*self.totalCols), #FIXME: Is this correct?
+            (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
             ])
 
+        stc.copy_to_gpu()
+
+        #Copy input data to GPU
+        cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
+        #Call GPU kernel
+        func(self.data_gpu, self.result_gpu, struct.get_ptr(), block=block, grid=grid)
+        #Get data back from GPU
+        cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
 
 
+    """
+    write_data
+
+    Writes results to output pipe. This pipe goes to dataSaver.py
+    """
     def write_data(self):
-        pass
+        #skip first and last rows, since they were buffers in the computation
+        for row in range(1, self.maxPossRows-1):
+            self.outputPipe.send(self.grom_gpu_buffer[row])
 
     def stop(self):
         print "Stopping..."
         exit(1)
 
+    """
+    get_kernel
+
+    given a string argument, packages a module for that kernel.
+    """
+    # NOTE: To create another kernel, add another if statement checking for
+    # the string you will identify the kernel by. Then return a SourceModule
+    # containing that kernel. Currently, our input/output code in recv_data
+    # and write_data assumes that the kernel will treat the first and last
+    # row of a given page as buffers that won't be written out.
+    # HOWEVER, recv_data is set up so that the last two rows of the preceeding
+    # page are used as the first two in the current one. This ensures that the
+    # last row of the preceeding page will still be analyzed.
     def get_kernel(self, kernelType):
         if kernelType = 'simple slope':
             return SourceModule("""
