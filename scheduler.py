@@ -84,7 +84,7 @@ def load_func(input_file, mem, NODATA):
       mem.to_gpu_buffer[1][col] = cur_line[col]
 
     # Grab a page worth of input data
-    for row in range(mem.maxPossRows):
+    for row in range(2, mem.maxPossRows):
       cur_str = f.readline()
 
       #Reached end of file
@@ -111,7 +111,7 @@ def load_func(input_file, mem, NODATA):
       #          sys.stdout.write(' ')
 
       cur_line = np.float64(cur_str.split())
-      for col in range(2, len(mem.to_gpu_buffer[row])):
+      for col in range(len(mem.to_gpu_buffer[row])):
         mem.to_gpu_buffer[row][col] = cur_line[col]
 
     #DEBUG
