@@ -1,6 +1,6 @@
 from osgeo import gdal
-from multiprocessing import Process,Condition, Lock
-import memoryInitializer
+from multiprocessing import Process,Condition, Lock, Pipe, Connection
+#import memoryInitializer
 from osgeo import gdal
 import struct, os
 import numpy as np
@@ -11,13 +11,17 @@ currently supported file types: [GEOTiff (.tif), ESRI ASCII format (.asc)]
 class dataLoader(Process):
 
     """
+        
     """
-    def __init__(self, input_file):
+    def __init__(self, input_file, output_pipe):
         Process.__init__(self)
+        self.output_pipe = output_pipe
         self.file_name = input_file
         self.open_file = _openFile()
-        self.header_info = _readHeaderInfo()
-        self.mem = None
+        
+        # get header info
+        _readHeaderInfo()
+
         self.cur_line=""
         self.prev_last_row=""
         self.stopBool = False
@@ -27,12 +31,7 @@ class dataLoader(Process):
         (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
     """
     def getHeaderInfo(self):
-        return header_info
-
-    """
-    """
-    def setMemInit(self, mem):
-        self.mem = mem
+        return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner
 
     """
         uses open file object and returns this header information:
@@ -40,22 +39,21 @@ class dataLoader(Process):
     """
     def _readHeaderInfo(self):
         if ".asc" in file:
-            ncols = np.int64(self.open_file.readline().split()[1])
-            nrows = np.int64(self.open_file.readline().split()[1])
-            xllcorner = self.open_file.readline().split()[1]
-            yllcorner = self.open_file.readline().split()[1]
-            cellsize = np.float64(self.open_file.readline().split()[1])
-            NODATA = np.float64(self.open_file.readline().split()[1])
+            self.totalCols = np.int64(self.open_file.readline().split()[1])
+            self.totalRows = np.int64(self.open_file.readline().split()[1])
+            self.xllcorner = self.open_file.readline().split()[1]
+            self.yllcorner = self.open_file.readline().split()[1]
+            self.cellsize = np.float64(self.open_file.readline().split()[1])
+            self.NODATA = np.float64(self.open_file.readline().split()[1])
         else if ".tif" in file:
             srcband = src_ds.GetRasterBand(1)
             GeoT = src_ds.GetGeoTransform()
-            NODATA = srcband.GetNoDataValue()
-            xllcorner = GeoT[0]
-            yllcorner = GeoT[3]
-            cellsize = srcband.GetScale()
-            nrows = srcband.YSize
-            ncols = srcband.XSize
-        return ncols, nrows, cellsize, NODATA, xllcorner, yllcorner
+            self.NODATA = srcband.GetNoDataValue()
+            self.xllcorner = GeoT[0]
+            self.yllcorner = GeoT[3]
+            self.cellsize = srcband.GetScale()
+            self.totalRows = srcband.YSize
+            self.totalCols = srcband.XSize
   
     """
         opens file_name and sets it to open_file
@@ -63,14 +61,15 @@ class dataLoader(Process):
     def _openFile(self):
         if ".asc" in self.file_name:
             self.open_file=open(file_name, 'r')
-        else if ".tif" in self.file_name:
+        elif ".tif" in self.file_name:
             self.open_file=gdal.Open(self.file_name)
 
     """
         Alerts the thread that it needs to quit
     """
     def stop(self):
-      self.stopBool=True
+        print "Stopping..."
+        exit(1)
 
     """
     """
@@ -81,7 +80,7 @@ class dataLoader(Process):
     def _getLine(self, row):
         if ".asc" in self.file_name:
             f=self.open_file.readline()
-        else if ".tif" in self.file_name:
+        elif ".tif" in self.file_name:
             try:
                 ncols = self.header_info[0]
                 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -89,53 +88,14 @@ class dataLoader(Process):
             except gdal.RuntimeError:
                 f=[]   
         return np.float64(f)
-        
 
     """
     """
     def _loadFunc(self):
-        count = self.mem.totalRows
-        cur_line = np.zeros(mem.totalCols)
-        cur_line.fill(NODATA)
-        prev_last_row = np.zeros(mem.totalCols)
-        prev_last_row.fill(NODATA)
-        while count > 0:
-            self.mem.to_gpu_buffer_lock.acquire()
-
-      # Wait until page is emptied
-            while mem.to_gpu_buffer_full.is_set():
-                self.mem.to_gpu_buffer_lock.wait()
-
-      #Insert last 2 rows of last iteration as first two in this iteration
-            for col in range(len(self.mem.to_gpu_buffer[0])):
-                self.mem.to_gpu_buffer[0][col] = prev_last_row[col]
-            for col in range(len(self.mem.to_gpu_buffer[1])):
-                self.mem.to_gpu_buffer[1][col] = cur_line[col]
-
-    
-      # Grab a page worth of input data
-            for row in range(self.mem.maxPossRows):
-                cur_str = self._getline(count+row)
-
-                #Reached end of file
-                if cur_str == []:
-          #fill rest with NODATA
-                    while row < mem.maxPossRows:
-                        for col in range(len(self.mem.to_gpu_buffer[row])):
-                            self.mem.to_gpu_buffer[row][col] = NODATA
-                        row += 1
-                break
-  
-            prev_last_row = cur_line.copy()
-            cur_line = np.float64(cur_str.split())
-            for col in range(2, len(self.mem.to_gpu_buffer[row])):
-                self.mem.to_gpu_buffer[row][col] = cur_line[col]
-    
-      # Notify that page is full
-        self.mem.to_gpu_buffer_full.set()
-        self.mem.to_gpu_buffer_lock.notify()
-        self.mem.to_gpu_buffer_lock.release()
-        count -= self.mem.maxPossRows
+        count = 0
+        while count < self.totalRows:
+             self.output_pipe.send(self.getLine(count))  
+        count += 1
 
         print "entire file loaded"
 
