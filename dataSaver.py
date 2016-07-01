@@ -1,4 +1,4 @@
-from multiprocessing import Process,Condition, Lock
+from multiprocessing import Process,Condition,Lock,Pipe,Connection
 import memoryInitializer
 import numpy as np
 
@@ -7,9 +7,10 @@ from os import remove
 
 class dataSaver(Process):
   
-    def __init__(self, header, output_file, input_pipe):
-        self.outFile = self.openFile(output_file)
+    def __init__(self, header, input_pipe):
+        self.outFile = None
         self.input_pipe=input_pipe
+
         #unpack header info
         self.totalCols = header[0]
         self.totalRows = header[1]
@@ -18,14 +19,10 @@ class dataSaver(Process):
         self.xllcorner = header[4]
         self.yllcorner = header[5]
 
-        outFile.write(header_str = ("ncols %f\n"
-								"nrows %f\n"
-								"xllcorner %f\n"
-								"yllcorner %f\n"
-								"cellsize %f\n"
-								"NODATA_value %f"
-								% (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
-								))
+    def run(self, fileName):
+        self.openFile(fileName)
+        self.write_func()
+        self.outFile.close()
 
     def stop(self):
         print "Stopping..."
@@ -45,11 +42,20 @@ class dataSaver(Process):
             print "Output file name was not a string"
             self.stop()
 
-        self.outFile.write(self.header)
+        # write out header
+        self.outFile.write(
+                "ncols %f\n
+                nrows %f\n
+                xllcorner %f\n
+                yllcorner %f\n
+                cellsize %f\n
+                NODATA_value %f"
+                % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
+                )
 
     def write_func(self):
         nrows = self.totalRows
-        count = o
+        count = 0
         ln=""
         while nrows > 0:
             # get line from pipe
@@ -66,9 +72,4 @@ class dataSaver(Process):
                 ln=""
             nrows-=count
         print "File completely written"
-
-    def run(self, fileName):
-        #self.openFile(fileName)
-        self.write_func()
-        self.outFile.close()
 
