@@ -28,7 +28,7 @@ class dataSaver(Process):
             self.stop()
         except ValueError:
             print "Output file name was not a string"
-            self.stop
+            self.stop()
 
         if self.header == None:
             print "Getting header information from memInit not yet implemented."
