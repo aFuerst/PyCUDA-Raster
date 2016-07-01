@@ -246,7 +246,7 @@ def calc_func(mem, nrows, ncols, cellsize, NODATA):
       (np.float64, 'NODATA', NODATA),
       (np.uint64, 'ncols', ncols),
       (np.uint64, 'nrows', mem.maxPossRows),
-      (np.uint64, 'npixels', mem.maxPossRows*nrows),
+      (np.uint64, 'npixels', mem.maxPossRows*ncols),
       ])
     stc.copy_to_gpu()
 
