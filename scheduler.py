@@ -4,6 +4,9 @@ from multiprocessing import Process,Condition, Lock
 import memoryInitializer
 from pycuda.driver import LogicError
 
+#####DEBUG######
+import sys
+#####DEBUG######
 """
 TODO: change getHeaderInfo and load_func to work with both tiff and ascii
       find way to make calc_func an independent process again
@@ -93,10 +96,33 @@ def load_func(input_file, mem, NODATA):
           row += 1
         break
 
-      prev_last_row = cur_line.copy()
+      #set prev_last_row to current row
+      np.put(prev_last_row, [i for i in range(prev_last_row.size)], cur_line)
+
+      #DEBUG
+      #if row == mem.maxPossRows - 1:
+      #      print "\ncur row in for loop:"
+      #      for i in range(len(cur_line)):
+      #          sys.stdout.write(str(cur_line[i]))
+      #          sys.stdout.write(' ')
+      #      print "prev row in for loop:"
+      #      for i in range(len(prev_last_row)):
+      #          sys.stdout.write(str(prev_last_row[i]))
+      #          sys.stdout.write(' ')
+
       cur_line = np.float64(cur_str.split())
       for col in range(2, len(mem.to_gpu_buffer[row])):
         mem.to_gpu_buffer[row][col] = cur_line[col]
+
+    #DEBUG
+    #print "prev row:"
+    #for i in range(len(prev_last_row)):
+    #    sys.stdout.write(str(prev_last_row[i]))
+    #    sys.stdout.write(' ')
+    #print "\ncur row:"
+    #for i in range(len(cur_line)):
+    #    sys.stdout.write(str(cur_line[i]))
+    #    sys.stdout.write(' ')
 
     # Notify that page is full
     mem.to_gpu_buffer_full.set()
@@ -282,7 +308,7 @@ def write_func(output_file, header, mem, nrows):
     ln=""
     count=0
     #Want to ignore buffer rows
-    for row in range(len(mem.from_gpu_buffer)):
+    for row in range(1, len(mem.from_gpu_buffer)-1):
       for col in mem.from_gpu_buffer[row]:
         ln+=str(col)
         ln+=' '
@@ -322,4 +348,4 @@ def getHeaderInfo(file):
   return ncols, nrows, cellsize, NODATA, xllcorner, yllcorner
 
 if __name__ == '__main__':
- run("alldem.asc", "output.asc")
+ run("aigrid.asc", "output.asc")
