@@ -1,9 +1,11 @@
 from osgeo import gdal
-from multiprocessing import Process,Condition, Lock, Pipe, Connection
-#import memoryInitializer
+from multiprocessing import Process, Pipe, Connection
 from osgeo import gdal
 import struct, os
 import numpy as np
+
+gdal.UseExceptions()
+fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
 
 """
 currently supported file types: [GEOTiff (.tif), ESRI ASCII format (.asc)]
@@ -11,20 +13,13 @@ currently supported file types: [GEOTiff (.tif), ESRI ASCII format (.asc)]
 class dataLoader(Process):
 
     """
-        
+
     """
-    def __init__(self, input_file, output_pipe):
+    def __init__(self, output_pipe):
         Process.__init__(self)
         self.output_pipe = output_pipe
-        self.file_name = input_file
-        self.open_file = _openFile()
-        
-        # get header info
-        _readHeaderInfo()
-
         self.cur_line=""
         self.prev_last_row=""
-        self.stopBool = False
 
     """
         Returns header information as a six-tuple in this order:
@@ -73,7 +68,11 @@ class dataLoader(Process):
 
     """
     """
-    #def run(self):
+    def run(self, input_file):
+        self._openFile(input_file)
+        self.file_name = input_file
+        self._readHeaderInfo()
+        self._loadFunc()
 
     """
     """
@@ -82,10 +81,8 @@ class dataLoader(Process):
             f=self.open_file.readline()
         elif ".tif" in self.file_name:
             try:
-                ncols = self.header_info[0]
-                fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
-                f=struct.unpack(fmttypes[gdal.GetDataTypeName(self.open_file.DataType)]*ncols, srcband.ReadRaster(0,row,srcband.XSize,1, buf_type=self.open_file.DataType))
-            except gdal.RuntimeError:
+                f=struct.unpack(fmttypes[gdal.GetDataTypeName(self.open_file.DataType)]*self.totalCols, srcband.ReadRaster(0,row,srcband.XSize,1, buf_type=self.open_file.DataType))
+            except RuntimeError:
                 f=[]   
         return np.float64(f)
 
@@ -94,7 +91,7 @@ class dataLoader(Process):
     def _loadFunc(self):
         count = 0
         while count < self.totalRows:
-             self.output_pipe.send(self.getLine(count))  
+             self.output_pipe.send(self._getLine(count))  
         count += 1
 
         print "entire file loaded"
