@@ -31,22 +31,64 @@ class GPUCalculator(Process):
         self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
         self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
 
+        self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
+
     def run(self, kernelType='simple slope'):
-        while True:
-            try self.recv_data():
-                self.process_data(self.get_kernel(kernelType))
-                self.write_data()
-            except EOFError:
-                break
+        #Process data while we continue to receive input
+        while self.recv_data():
+            self.process_data(self.get_kernel(kernelType))
+            self.write_data()
+        #Process remaining data in buffer
+        self.process_data(self.get_kernel(kernelType))
+        self.write_data()
 
     def recv_data(self):
-        #num_bytes = self.to_gpu_buffer.nbytes
-        #while num_bytes > 0:
-        #    num_bytes -=
-        pass
+        #insert carry over rows from last page
+        for col in range(self.totalCols):
+            self.to_gpu_buffer[0][col] = carry_over_rows[0][col]
+            self.to_gpu_buffer[1][col] = carry_over_rows[1][col]
+        row_count = 2
+
+        #Receive a page of data from buffer
+        while row_count <  self.maxPossRows:
+            try:
+                cur_row = self.input_pipe.recv()
+                for col in range(self.totalCols):
+                    self.to_gpu_buffer[row_count][col] = cur_row[col]
+            except EOFError:
+                while row_count < self.maxPossRows:
+                    for col in range(self.totalCols):
+                        self.to_gpu_buffer[row_count][col] = self.NODATA
+                    row_count += 1
+                return False
+
+            row_count += 1
+
+        #Update carry over rows
+        np.put(self.carry_over_rows[0], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.totalCols-2])
+        np.put(self.carry_over_rows[1], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.totalCols-1])
+
+        return True
 
     def process_data(self, mod):
-        pass
+
+        #GPU layout information
+        func = mod.get_function("raster_function")
+        grid = (4,4)
+        block = (32,32,1)
+        num_blocks = grid[0] * grid[1]
+        threads_per_block = block[0]*block[1]*block[2]
+
+        #information struct passed to GPU
+        stc = GPUStruct([
+            (np.float64, 'pixels_per_thread', pixels_per_thread),
+            (np.float64, 'NODATA', self.NODATA),
+            (np.uint64, 'ncols', self.totalCols),
+            (np.uint64, 'nrows', self.maxPossRows),
+            (np.uint64, 'npixels', self.maxPossRows*self.totalCols), #FIXME: Is this correct?
+            ])
+
+
 
     def write_data(self):
         pass
@@ -103,7 +145,7 @@ class GPUCalculator(Process):
                             handles a variable number of calculations based on its thread/block location 
                             and the size of pixels_per_thread in file_info
                     ************************************************************************************************/
-                    __global__ void simple_slope(double *data, double *result, passed_in *file_info){
+                    __global__ void raster_function(double *data, double *result, passed_in *file_info){
                             /* get individual thread x,y values */
                             unsigned long long x = blockIdx.x * blockDim.x + threadIdx.x;
                             unsigned long long y = blockIdx.y * blockDim.y + threadIdx.y; 
