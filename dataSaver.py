@@ -7,10 +7,25 @@ from os import remove
 
 class dataSaver(Process):
   
-    def __init__(self, _memInit, _header=None):
-        self.memInit = _memInit
-        self.header = _header
-        self.outFile = None
+    def __init__(self, header, output_file, input_pipe):
+        self.outFile = self.openFile(output_file)
+        self.input_pipe=input_pipe
+        #unpack header info
+        self.totalCols = header[0]
+        self.totalRows = header[1]
+        self.cellsize = header[2]
+        self.NODATA = header[3]
+        self.xllcorner = header[4]
+        self.yllcorner = header[5]
+
+        outFile.write(header_str = ("ncols %f\n"
+								"nrows %f\n"
+								"xllcorner %f\n"
+								"yllcorner %f\n"
+								"cellsize %f\n"
+								"NODATA_value %f"
+								% (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
+								))
 
     def stop(self):
         print "Stopping..."
@@ -30,46 +45,30 @@ class dataSaver(Process):
             print "Output file name was not a string"
             self.stop()
 
-        if self.header == None:
-            print "Getting header information from memInit not yet implemented."
-            print "Exiting..."
-            self.stop()
-        else:
-            self.outFile.write(self.header)
+        self.outFile.write(self.header)
 
     def write_func(self):
-        nrows = self.memInit.totalRows
-
+        nrows = self.totalRows
+        count = o
+        ln=""
         while nrows > 0:
-            self.memInit.from_gpu_buffer_lock.acquire()
-            while not self.memInit.from_gpu_buffer_full.is_set():
-                self.memInit.from_gpu_buffer_lock.wait()
-
-            ln=""
-            count=0
-            #Want to ignore buffer rows
-            for row in range(1, len(self.memInit.from_gpu_buffer)-1):
-                for col in self.memInit.from_gpu_buffer[row]:
-                    ln+=str(col)
-                    ln+=' '
-                ln+='\n'
-                count+=1
-                if count > 15:
-                    count=0
-                    f.write(ln)
-                    ln=""
-            
-            if count <= 15:
-                f.write(ln)
-
-            f.flush()  
-            nrows-=len(self.memInit.from_gpu_buffer)
-
-            self.memInit.from_gpu_buffer_full.clear()
-            self.memInit.from_gpu_buffer_lock.notify()
-            self.memInit.from_gpu_buffer_lock.release()
+            # get line from pipe
+            arr=self.input_pipe.recv()
+            for i in arr:
+                ln+=str(i)
+            ln+='\n'
+            count+=1
+            if count > 15:
+                # write out accumulated lines
+                self.outFile.write(ln)
+                self.outFile.flush()
+                count = 0
+                ln=""
+            nrows-=count
+        print "File completely written"
 
     def run(self, fileName):
-        self.openFile(fileName)
+        #self.openFile(fileName)
         self.write_func()
         self.outFile.close()
+
