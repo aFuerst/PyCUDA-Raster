@@ -1,6 +1,5 @@
 from osgeo import gdal
-from multiprocessing import Process, Pipe, Connection
-from osgeo import gdal
+from multiprocessing import Process, Pipe
 import struct, os
 import numpy as np
 
@@ -15,9 +14,12 @@ class dataLoader(Process):
     """
 
     """
-    def __init__(self, output_pipe):
+    def __init__(self, inputFile, output_pipe):
         Process.__init__(self)
         self.output_pipe = output_pipe
+        self.file_name = inputFile
+        self._openFile()
+        self._readHeaderInfo()
         self.cur_line=""
         self.prev_last_row=""
 
@@ -33,14 +35,14 @@ class dataLoader(Process):
         (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
     """
     def _readHeaderInfo(self):
-        if ".asc" in file:
+        if ".asc" in self.file_name:
             self.totalCols = np.int64(self.open_file.readline().split()[1])
             self.totalRows = np.int64(self.open_file.readline().split()[1])
-            self.xllcorner = self.open_file.readline().split()[1]
-            self.yllcorner = self.open_file.readline().split()[1]
+            self.xllcorner = np.float64(self.open_file.readline().split()[1])
+            self.yllcorner = np.float64(self.open_file.readline().split()[1])
             self.cellsize = np.float64(self.open_file.readline().split()[1])
             self.NODATA = np.float64(self.open_file.readline().split()[1])
-        else if ".tif" in file:
+        elif ".tif" in self.file_name:
             srcband = src_ds.GetRasterBand(1)
             GeoT = src_ds.GetGeoTransform()
             self.NODATA = srcband.GetNoDataValue()
@@ -55,7 +57,7 @@ class dataLoader(Process):
     """
     def _openFile(self):
         if ".asc" in self.file_name:
-            self.open_file=open(file_name, 'r')
+            self.open_file=open(self.file_name, 'r')
         elif ".tif" in self.file_name:
             self.open_file=gdal.Open(self.file_name)
 
@@ -68,17 +70,17 @@ class dataLoader(Process):
 
     """
     """
-    def run(self, input_file):
-        self._openFile(input_file)
-        self.file_name = input_file
-        self._readHeaderInfo()
+    def run(self):
+        #self._openFile(input_file)
+        #self.file_name = input_file
+        #self._readHeaderInfo()
         self._loadFunc()
 
     """
     """
     def _getLine(self, row):
         if ".asc" in self.file_name:
-            f=self.open_file.readline()
+            f=self.open_file.readline().split()
         elif ".tif" in self.file_name:
             try:
                 f=struct.unpack(fmttypes[gdal.GetDataTypeName(self.open_file.DataType)]*self.totalCols, srcband.ReadRaster(0,row,srcband.XSize,1, buf_type=self.open_file.DataType))
@@ -91,9 +93,10 @@ class dataLoader(Process):
     def _loadFunc(self):
         count = 0
         while count < self.totalRows:
-             self.output_pipe.send(self._getLine(count))  
-        count += 1
-
+            self.output_pipe.send(self._getLine(count))
+            #print count
+            count += 1
+        self.output_pipe.close()
         print "entire file loaded"
 
 

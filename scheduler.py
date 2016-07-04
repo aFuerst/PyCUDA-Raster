@@ -1,4 +1,4 @@
-import dataLoader, gpucalc, dataSaver
+import dataLoader, gpuCalc, dataSaver
 import numpy as np
 from multiprocessing import Process, Pipe, Connection
 
@@ -10,7 +10,7 @@ def run(inputFile, outputFile):
     loader = dataLoader(inputFile, inputPipe[0])
     header = loader.getHeaderInfo()
     calc = GPUCalculator(header, inputPipe[1], outputPipe[0])
-    saver = dataSaver(outputPipe[1])
+    saver = dataSaver(outputFile, outputPipe[1])
 
     # start all threads
     loader.start()
