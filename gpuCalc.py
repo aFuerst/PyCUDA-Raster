@@ -3,12 +3,28 @@ import numpy as np
 from gpustruct import GPUStruct
 
 import pycuda.driver as cuda
-#import pycuda.tools as tools
-#import pycuda.autoinit
 from pycuda.compiler import SourceModule
 
+"""
+GPUCalculator
+
+Class that takes and sends data from pipes and goes GPU calculations on it
+designed to run as a separate process and inherits from Process module
+
+currently supported functions: slope
+"""
 class GPUCalculator(Process):
   
+    """
+    __init__
+
+    paramaters:
+        header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
+        _inputPipe - a Pipe object to read information from
+        _outputPipe - a Pipe object to send information to
+
+    creates empty instance variables needed later
+    """
     def __init__(self, header, _inputPipe, _outputPipe):
         Process.__init__(self)
 
@@ -45,6 +61,8 @@ class GPUCalculator(Process):
     Overrides default Process.run()
     Given a kernel type, retrieves the C code for that kernel, and runs the
     data processing loop
+
+    does CUDA initialization and sets local device and context
     """
     def run(self, kernelType='simple slope'):
         cuda.init()
@@ -68,10 +86,14 @@ class GPUCalculator(Process):
         self.process_data()
         self.write_data(count)
 
-        
-
         print "done on GPU"
 
+    """
+    _gpuAlloc
+
+    determines how much free memory is on the GPU and allocates as much as needed
+    creates pagelocked buffers of equal size to GPU memory
+    """
     def _gpuAlloc(self):
         #Get GPU information
         self.freeMem = cuda.mem_get_info()[0] * .5 * .8
@@ -81,6 +103,7 @@ class GPUCalculator(Process):
             print "reducing max rows to reduce memory use on GPU"
             self.maxPossRows = self.totalRows
 
+        # create pagelocked buffers and GPU arrays
         self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
         self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
         self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
@@ -105,22 +128,20 @@ class GPUCalculator(Process):
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
             try:
+                # check if something is in the pipe for 5 seconds
                 if self.inputPipe.poll(5):
                     cur_row = self.inputPipe.recv()
                 else:
+                    # end of file reached
                     raise EOFError
-                #print "here", row_count
+
                 for col in range(self.totalCols):
                     self.to_gpu_buffer[row_count][col] = cur_row[col]
 
             #Pipe was closed, no more input data
             except EOFError:
-                #if row_count == 0:
-                print "EOF reached", row_count
-                #    return False
                 #Fill rest of page with NODATA
                 while row_count < self.maxPossRows:
-                    #print "here", row_count
                     for col in range(self.totalCols):
                         self.to_gpu_buffer[row_count][col] = self.NODATA
                     row_count += 1
@@ -178,12 +199,18 @@ class GPUCalculator(Process):
     def write_data(self, count):
         #skip first and last rows, since they were buffers in the computation
         for row in range(1, self.maxPossRows-1):
-            # see if written out more than total number of rows
+            # see if written out more than total number of rows plus a small buffer
+            # pipe.send seems to sopt working after too many sends and nothing is taken off
             if count + row - 3 > self.totalRows:
                 print "done", row
                 break
             self.outputPipe.send(self.from_gpu_buffer[row])
 
+    """
+    stop 
+
+    Alerts the thread that it needs to quit
+    """
     def stop(self):
         print "Stopping..."
         exit(1)

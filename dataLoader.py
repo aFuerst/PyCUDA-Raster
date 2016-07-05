@@ -7,12 +7,24 @@ gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
 
 """
-currently supported file types: [GEOTiff (.tif), ESRI ASCII format (.asc)]
+dataLoader
+
+Class that reads data from a given input file and passes it to a Pipe object
+designed to run as a separate process and inherits from Process module
+
+currently supported input file types: [GEOTiff (.tif), ESRI ASCII format (.asc)]
 """
 class dataLoader(Process):
 
     """
+    __init__
 
+    paramaters:
+        inputFile - must be a valid file path as a string
+        output_pipe - a Pipe object to pass read information into
+   
+    opens the input file and grabs the header information
+    sets several instance variables
     """
     def __init__(self, inputFile, output_pipe):
         Process.__init__(self)
@@ -24,15 +36,18 @@ class dataLoader(Process):
         self.prev_last_row=""
 
     """
-        Returns header information as a six-tuple in this order:
-        (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
+    getHeaderInfo
+    
+    Returns header information as a six-tuple in this order:
+    (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
     """
     def getHeaderInfo(self):
         return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner
 
     """
-        uses open file object and returns this header information:
-        (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
+    _readHeaderInfo
+
+    requires file to be opened already, gets header info from file and puts it in instance variables
     """
     def _readHeaderInfo(self):
         if ".asc" in self.file_name:
@@ -53,7 +68,9 @@ class dataLoader(Process):
             self.totalCols = srcband.XSize
   
     """
-        opens file_name and sets it to open_file
+    _openFile
+
+    opens file_name and sets it to open_file, supports '.tif' and '.asc' files
     """
     def _openFile(self):
         if ".asc" in self.file_name:
@@ -62,21 +79,26 @@ class dataLoader(Process):
             self.open_file=gdal.Open(self.file_name)
 
     """
-        Alerts the thread that it needs to quit
+    stop 
+
+    Alerts the thread that it needs to quit
     """
     def stop(self):
         print "Stopping..."
         exit(1)
 
     """
+    run
+
+    calls functions needed to read all data from file_name
     """
     def run(self):
-        #self._openFile(input_file)
-        #self.file_name = input_file
-        #self._readHeaderInfo()
         self._loadFunc()
 
     """
+    _getLine
+
+    returns a single row from the open file as a numpy float64 array
     """
     def _getLine(self, row):
         if ".asc" in self.file_name:
@@ -89,6 +111,9 @@ class dataLoader(Process):
         return np.float64(f)
 
     """
+    _loadFunc
+
+    sends data one row at a time to output_pipe, sends exactly the number of rows as are in the input file
     """
     def _loadFunc(self):
         count = 0
