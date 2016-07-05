@@ -1,4 +1,4 @@
-from multiprocessing import Process,Condition,Lock,Pipe,Connection
+from multiprocessing import Process,Pipe
 import memoryInitializer
 import numpy as np
 
@@ -33,6 +33,9 @@ class GPUCalculator(Process):
         self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
         self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
 
+        #CUDA kernel to be run
+        self.kernel = None
+
         #carry over rows used to insert last two lines of data from one page
         #as first two lines in next page
         self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
@@ -47,7 +50,8 @@ class GPUCalculator(Process):
     def run(self, kernelType='simple slope'):
         #Process data while we continue to receive input
         while self.recv_data():
-            self.process_data(self.get_kernel(kernelType))
+            self.get_kernel(kernelType)
+            self.process_data()
             self.write_data()
         #Process remaining data in buffer
         self.process_data(self.get_kernel(kernelType))
@@ -66,8 +70,8 @@ class GPUCalculator(Process):
     def recv_data(self):
         #insert carry over rows from last page
         for col in range(self.totalCols):
-            self.to_gpu_buffer[0][col] = carry_over_rows[0][col]
-            self.to_gpu_buffer[1][col] = carry_over_rows[1][col]
+            self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
+            self.to_gpu_buffer[1][col] = self.carry_over_rows[1][col]
         row_count = 2
 
         #Receive a page of data from buffer
@@ -102,10 +106,10 @@ class GPUCalculator(Process):
     copies input data from a pagelocked buffer, runs the kernel and copies 
     the output to a second pagelocked buffer
     """
-    def process_data(self, mod):
+    def process_data(self):
 
         #GPU layout information
-        func = mod.get_function("raster_function")
+        func = self.kernel.get_function("raster_function")
         grid = (4,4)
         block = (32,32,1)
         num_blocks = grid[0] * grid[1]
@@ -158,8 +162,8 @@ class GPUCalculator(Process):
     # page are used as the first two in the current one. This ensures that the
     # last row of the preceeding page will still be analyzed.
     def get_kernel(self, kernelType):
-        if kernelType = 'simple slope':
-            return SourceModule("""
+        if kernelType == 'simple slope':
+            self.kernel = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>
 
@@ -242,6 +246,6 @@ class GPUCalculator(Process):
                             }
                     }
                     """)
-            else:
-                print "CUDA kernel not implemented"
-                self.stop()
+        else:
+            print "CUDA kernel not implemented"
+            self.stop()
