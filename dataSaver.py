@@ -96,7 +96,6 @@ class dataSaver(Process):
     """
     def write_func(self):
         nrows = self.totalRows
-        print nrows
         count = 0
         ln=""
         while nrows > 0:
@@ -122,5 +121,5 @@ class dataSaver(Process):
             nrows-=1
         self.outFile.write(ln)
 
-        print "File completely written"
+        print "Output written to disk"
 

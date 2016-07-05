@@ -119,9 +119,8 @@ class dataLoader(Process):
         count = 0
         while count < self.totalRows:
             self.output_pipe.send(self._getLine(count))
-            #print count
             count += 1
         self.output_pipe.close()
-        print "entire file loaded"
+        print "Input file loaded from disk"
 
 

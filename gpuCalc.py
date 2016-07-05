@@ -83,12 +83,12 @@ class GPUCalculator(Process):
             self.process_data()
             self.write_data(count)
             count += (self.maxPossRows-2)  # -2 because of buffer rows
-            print "one iteration done"
+            print "Page done..."
         #Process remaining data in buffer
         self.process_data()
         self.write_data(count)
 
-        print "done on GPU"
+        print "GPU calculations finished"
 
     """
     _gpuAlloc
@@ -148,11 +148,9 @@ class GPUCalculator(Process):
 
             #Pipe was closed, no more input data
             except EOFError:
-                #Fill rest of page with NODATA
-                while row_count < self.maxPossRows:
-                    for col in range(self.totalCols):
-                        self.to_gpu_buffer[row_count][col] = self.NODATA
-                    row_count += 1
+                #Write a NODATA buffer row
+                for col in range(self.totalCols):
+                    self.to_gpu_buffer[row_count][col] = self.NODATA
                 return False
 
             row_count += 1
@@ -210,7 +208,6 @@ class GPUCalculator(Process):
             # see if written out more than total number of rows plus a small buffer
             # pipe.send seems to sopt working after too many sends and nothing is taken off
             if count + row > self.totalRows:
-                print "done", row
                 break
             self.outputPipe.send(self.from_gpu_buffer[row])
 
