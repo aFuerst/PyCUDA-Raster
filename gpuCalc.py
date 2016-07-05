@@ -54,6 +54,8 @@ class GPUCalculator(Process):
         #carry over rows used to insert last two lines of data from one page
         #as first two lines in next page
         self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
+        self.carry_over_rows[0].fill(self.NODATA)
+        self.carry_over_rows[1].fill(self.NODATA)
 
     """
     run
@@ -71,7 +73,7 @@ class GPUCalculator(Process):
 
         self._gpuAlloc()
 
-        self.kernel = self.get_kernel()
+        self.kernel = self.get_kernel(kernelType)
         self.func = self.kernel.get_function("raster_function")
 
         #Process data while we continue to receive input
@@ -119,12 +121,13 @@ class GPUCalculator(Process):
     to indicate that we should break out of the processing loop.
     """
     def recv_data(self, count):
-        #insert carry over rows from last page
         if count == 0:
-            #for col in range(self.totalCols):
-            #    self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
-            row_count = 0            
+            #If this is the first page, insert a buffer row
+            for col in range(self.totalCols):
+                self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
+            row_count = 1           
         else:
+            #otherwise, insert carry over rows from last page
             for col in range(self.totalCols):
                 self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
                 self.to_gpu_buffer[1][col] = self.carry_over_rows[1][col]
@@ -155,8 +158,8 @@ class GPUCalculator(Process):
             row_count += 1
 
         #Update carry over rows
-        np.put(self.carry_over_rows[0], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.totalCols-2])
-        np.put(self.carry_over_rows[1], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.totalCols-1])
+        np.put(self.carry_over_rows[0], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-2])
+        np.put(self.carry_over_rows[1], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-1])
 
         return True
 
@@ -233,8 +236,8 @@ class GPUCalculator(Process):
     # HOWEVER, recv_data is set up so that the last two rows of the preceeding
     # page are used as the first two in the current one. This ensures that the
     # last row of the preceeding page will still be analyzed.
-    def get_kernel(self):
-        #if kernelType == 'simple slope':
+    def get_kernel(self, kernelType):
+        if kernelType == 'simple slope':
             mod = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>
@@ -319,6 +322,6 @@ class GPUCalculator(Process):
                     }
                     """)
             return mod
-        #else:
-        #    print "CUDA kernel not implemented"
-        #    self.stop()
+        else:
+            print "CUDA kernel not implemented"
+            self.stop()
