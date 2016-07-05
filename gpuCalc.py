@@ -57,14 +57,18 @@ class GPUCalculator(Process):
         self.func = self.kernel.get_function("raster_function")
 
         #Process data while we continue to receive input
+        count = 0
         while self.recv_data():
             #self.get_kernel(kernelType)
             self.process_data()
-            self.write_data()
+            self.write_data(count)
+            count += self.maxPossRows
             print "one iteration done"
         #Process remaining data in buffer
         self.process_data()
-        self.write_data()
+        self.write_data(count)
+
+        
 
         print "done on GPU"
 
@@ -101,14 +105,22 @@ class GPUCalculator(Process):
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
             try:
-                cur_row = self.inputPipe.recv()
+                if self.inputPipe.poll(5):
+                    cur_row = self.inputPipe.recv()
+                else:
+                    raise EOFError
+                #print "here", row_count
                 for col in range(self.totalCols):
                     self.to_gpu_buffer[row_count][col] = cur_row[col]
 
             #Pipe was closed, no more input data
             except EOFError:
+                #if row_count == 0:
+                print "EOF reached", row_count
+                #    return False
                 #Fill rest of page with NODATA
                 while row_count < self.maxPossRows:
+                    #print "here", row_count
                     for col in range(self.totalCols):
                         self.to_gpu_buffer[row_count][col] = self.NODATA
                     row_count += 1
@@ -138,6 +150,7 @@ class GPUCalculator(Process):
         num_blocks = grid[0] * grid[1]
         threads_per_block = block[0]*block[1]*block[2]
         pixels_per_thread = np.ceil((self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks))
+
         #information struct passed to GPU
         stc = GPUStruct([
             (np.float64, 'pixels_per_thread', pixels_per_thread),
@@ -162,9 +175,13 @@ class GPUCalculator(Process):
 
     Writes results to output pipe. This pipe goes to dataSaver.py
     """
-    def write_data(self):
+    def write_data(self, count):
         #skip first and last rows, since they were buffers in the computation
         for row in range(1, self.maxPossRows-1):
+            # see if written out more than total number of rows
+            if count + row - 3 > self.totalRows:
+                print "done", row
+                break
             self.outputPipe.send(self.from_gpu_buffer[row])
 
     def stop(self):
