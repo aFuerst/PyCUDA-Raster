@@ -53,7 +53,7 @@ class GPUCalculator(Process):
 
         #carry over rows used to insert last two lines of data from one page
         #as first two lines in next page
-        self.carry_over_rows = [np.zeros(self.totalCols).fill(self.NODATA), np.zeros(self.totalCols).fill(self.NODATA)]
+        self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
 
     """
     run
@@ -76,7 +76,7 @@ class GPUCalculator(Process):
 
         #Process data while we continue to receive input
         count = 0
-        while self.recv_data():
+        while self.recv_data(count):
             #self.get_kernel(kernelType)
             self.process_data()
             self.write_data(count)
@@ -118,12 +118,17 @@ class GPUCalculator(Process):
     If the pipe closes, fill the rest of the page with NODATA, and return false
     to indicate that we should break out of the processing loop.
     """
-    def recv_data(self):
+    def recv_data(self, count):
         #insert carry over rows from last page
-        for col in range(self.totalCols):
-            self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
-            self.to_gpu_buffer[1][col] = self.carry_over_rows[1][col]
-        row_count = 2
+        if count == 0:
+            #for col in range(self.totalCols):
+            #    self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
+            row_count = 0            
+        else:
+            for col in range(self.totalCols):
+                self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
+                self.to_gpu_buffer[1][col] = self.carry_over_rows[1][col]
+            row_count = 2
 
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
