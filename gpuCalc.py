@@ -1,14 +1,21 @@
 from multiprocessing import Process,Pipe
-import memoryInitializer
 import numpy as np
+from gpustruct import GPUStruct
 
 import pycuda.driver as cuda
-import pycuda.autoinit
+#import pycuda.tools as tools
+#import pycuda.autoinit
 from pycuda.compiler import SourceModule
+
 class GPUCalculator(Process):
   
     def __init__(self, header, _inputPipe, _outputPipe):
         Process.__init__(self)
+
+        # CUDA device info
+        self.device = None
+        self.context = None
+
         self.inputPipe = _inputPipe
         self.outputPipe = _outputPipe 
 
@@ -18,23 +25,15 @@ class GPUCalculator(Process):
         self.cellsize = header[2]
         self.NODATA = header[3]
 
-        #Get GPU information
-        self.freeMem = cuda.mem_get_info()[0] * .5 * .8
-        self.maxPossRows = np.int(np.floor(self.freeMem / (8 * self.totalCols)))
-        # set max rows to smaller number to save memory usage
-        if self.totalRows < self.maxPossRows:
-            print "reducing max rows to fit on GPU"
-            self.maxPossRows = self.totalRows
-
-        #Allocate space for data in main memory and GPU memory
-        #Use pagelocked buffers for efficiency purposes
-        self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
-        self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
-        self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
-        self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
+        # memory information
+        self.to_gpu_buffer = None
+        self.from_gpu_buffer = None
+        self.data_gpu = None
+        self.result_gpu = None
 
         #CUDA kernel to be run
         self.kernel = None
+        self.func = None
 
         #carry over rows used to insert last two lines of data from one page
         #as first two lines in next page
@@ -48,15 +47,40 @@ class GPUCalculator(Process):
     data processing loop
     """
     def run(self, kernelType='simple slope'):
+        cuda.init()
+        self.device = cuda.Device(0)
+        self.context = self.device.make_context()
+
+        self._gpuAlloc()
+
+        self.kernel = self.get_kernel()
+        self.func = self.kernel.get_function("raster_function")
+
         #Process data while we continue to receive input
         while self.recv_data():
-            self.get_kernel(kernelType)
+            #self.get_kernel(kernelType)
             self.process_data()
             self.write_data()
+            print "one iteration done"
         #Process remaining data in buffer
-        self.process_data(self.get_kernel(kernelType))
+        self.process_data()
         self.write_data()
 
+        print "done on GPU"
+
+    def _gpuAlloc(self):
+        #Get GPU information
+        self.freeMem = cuda.mem_get_info()[0] * .5 * .8
+        self.maxPossRows = np.int(np.floor(self.freeMem / (8 * self.totalCols)))
+        # set max rows to smaller number to save memory usage
+        if self.totalRows < self.maxPossRows:
+            print "reducing max rows to reduce memory use on GPU"
+            self.maxPossRows = self.totalRows
+
+        self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
+        self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
+        self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
+        self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
 
     """
     recv_data
@@ -107,14 +131,13 @@ class GPUCalculator(Process):
     the output to a second pagelocked buffer
     """
     def process_data(self):
-
         #GPU layout information
-        func = self.kernel.get_function("raster_function")
+        #func = self.kernel.get_function("raster_function")
         grid = (4,4)
         block = (32,32,1)
         num_blocks = grid[0] * grid[1]
         threads_per_block = block[0]*block[1]*block[2]
-
+        pixels_per_thread = np.ceil((self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks))
         #information struct passed to GPU
         stc = GPUStruct([
             (np.float64, 'pixels_per_thread', pixels_per_thread),
@@ -129,7 +152,7 @@ class GPUCalculator(Process):
         #Copy input data to GPU
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         #Call GPU kernel
-        func(self.data_gpu, self.result_gpu, struct.get_ptr(), block=block, grid=grid)
+        self.func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
         #Get data back from GPU
         cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
 
@@ -142,7 +165,7 @@ class GPUCalculator(Process):
     def write_data(self):
         #skip first and last rows, since they were buffers in the computation
         for row in range(1, self.maxPossRows-1):
-            self.outputPipe.send(self.grom_gpu_buffer[row])
+            self.outputPipe.send(self.from_gpu_buffer[row])
 
     def stop(self):
         print "Stopping..."
@@ -161,9 +184,9 @@ class GPUCalculator(Process):
     # HOWEVER, recv_data is set up so that the last two rows of the preceeding
     # page are used as the first two in the current one. This ensures that the
     # last row of the preceeding page will still be analyzed.
-    def get_kernel(self, kernelType):
-        if kernelType == 'simple slope':
-            self.kernel = SourceModule("""
+    def get_kernel(self):
+        #if kernelType == 'simple slope':
+            mod = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>
 
@@ -246,6 +269,7 @@ class GPUCalculator(Process):
                             }
                     }
                     """)
-        else:
-            print "CUDA kernel not implemented"
-            self.stop()
+            return mod
+        #else:
+        #    print "CUDA kernel not implemented"
+        #    self.stop()
