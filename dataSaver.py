@@ -63,8 +63,8 @@ class dataSaver(Process):
             try:
                 arr=self.input_pipe.recv()
             except EOFError:
-                break
                 print "Pipe empty"
+                break
             
             for i in range(len(arr)):
                 ln+=str(arr[i])
@@ -79,6 +79,7 @@ class dataSaver(Process):
                 count = 0
                 ln=""
             nrows-=1
+        self.outFile.write(ln)
 
         print "File completely written"
 
