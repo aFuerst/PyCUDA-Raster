@@ -53,7 +53,7 @@ class GPUCalculator(Process):
 
         #carry over rows used to insert last two lines of data from one page
         #as first two lines in next page
-        self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
+        self.carry_over_rows = [np.zeros(self.totalCols).fill(self.NODATA), np.zeros(self.totalCols).fill(self.NODATA)]
 
     """
     run
@@ -80,7 +80,7 @@ class GPUCalculator(Process):
             #self.get_kernel(kernelType)
             self.process_data()
             self.write_data(count)
-            count += self.maxPossRows
+            count += (self.maxPossRows-2)  # -2 because of buffer rows
             print "one iteration done"
         #Process remaining data in buffer
         self.process_data()
@@ -201,7 +201,7 @@ class GPUCalculator(Process):
         for row in range(1, self.maxPossRows-1):
             # see if written out more than total number of rows plus a small buffer
             # pipe.send seems to sopt working after too many sends and nothing is taken off
-            if count + row - 3 > self.totalRows:
+            if count + row > self.totalRows:
                 print "done", row
                 break
             self.outputPipe.send(self.from_gpu_buffer[row])
