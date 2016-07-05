@@ -28,8 +28,7 @@ import resources
 from link_test_dialog import LinkerTesterDialog
 import os.path
 
-import slope_serial
-
+import scheduler
 
 class LinkerTester:
     """QGIS Plugin Implementation."""
@@ -213,4 +212,5 @@ class LinkerTester:
         if result:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
-            slope_serial.main(self.dlg.inputLineEdit.text(),self.dlg.outputLineEdit.text())
+            # slope_serial.main(self.dlg.inputLineEdit.text(),self.dlg.outputLineEdit.text())
+            scheduler.run(self.dlg.inputLineEdit.text(), self.dlg.outputLineEdit.text())
