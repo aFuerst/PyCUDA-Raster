@@ -133,17 +133,19 @@ def calc_aspect_for_aspect(data, row, col, cellsize, NODATA):
 				/ (8*cellsize)
 	dz_dy = (nbhd[6] + 2*nbhd[7] + nbhd[8] - (nbhd[0] + 2*nbhd[1] + nbhd[2])) \
 				/ (8*cellsize)
+	if dz_dx == NODATA or dz_dy == NODATA or (dz_dx == 0.0 and dz_dy == 0.0):
+		return NODATA
+	else:
+		aspect = (57.29578 * (np.arctan2(dz_dy, -(dz_dx))))     
 
-	aspect = (57.29578 * (np.arctan2(dz_dy, -(dz_dx))))     
+	        if aspect < 0:
+	                aspect = 90.0 - aspect
+        	elif aspect > 90.0:
+        	        aspect = 360.0 - aspect + 90.0
+       		else:
+        	        aspect = 90.0 - aspect
 
-        if aspect < 0:
-                aspect = 90.0 - aspect
-        elif aspect > 90.0:
-                aspect = 360.0 - aspect + 90.0
-        else:
-                aspect = 90.0 - aspect
-
-        aspect = (aspect * (np.pi / 180.0))
+       		aspect = (aspect * (np.pi / 180.0))
 
 	return aspect
 	
