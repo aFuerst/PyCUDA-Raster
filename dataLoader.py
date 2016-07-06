@@ -53,8 +53,8 @@ class dataLoader(Process):
     """
     def _readHeaderInfo(self):
         if ".asc" in self.file_name:
-            self.totalCols = np.int64(self.open_file.readline().split()[1])
-            self.totalRows = np.int64(self.open_file.readline().split()[1])
+            self.totalCols = np.int64(float(self.open_file.readline().split()[1]))
+            self.totalRows = np.int64(float(self.open_file.readline().split()[1]))
             self.xllcorner = np.float64(self.open_file.readline().split()[1])
             self.yllcorner = np.float64(self.open_file.readline().split()[1])
             self.cellsize = np.float64(self.open_file.readline().split()[1])

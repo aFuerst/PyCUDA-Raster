@@ -67,7 +67,7 @@ class GPUCalculator(Process):
 
     does CUDA initialization and sets local device and context
     """
-    def run(self, kernelType='simple slope'):
+    def run(self):
         cuda.init()
         self.device = cuda.Device(0)
         self.context = self.device.make_context()
@@ -80,7 +80,6 @@ class GPUCalculator(Process):
         #Process data while we continue to receive input
         count = 0
         while self.recv_data(count):
-            #self.get_kernel(kernelType)
             self.process_data()
             self.write_data(count)
             count += (self.maxPossRows-2)  # -2 because of buffer rows
