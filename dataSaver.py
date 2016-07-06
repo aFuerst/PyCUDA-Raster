@@ -2,7 +2,6 @@ from multiprocessing import Process, Pipe
 import numpy as np
 from os.path import exists
 from os import remove
-
 """
 dataSaver
 
@@ -47,7 +46,7 @@ class dataSaver(Process):
         self._openFile()
         self.write_func()
         self.outFile.close()
-
+        
     """
     stop
     
@@ -96,8 +95,6 @@ class dataSaver(Process):
     """
     def write_func(self):
         nrows = self.totalRows
-        count = 0
-        ln=""
         while nrows > 0:
             # get line from pipe
             try:
@@ -105,21 +102,8 @@ class dataSaver(Process):
             except EOFError:
                 print "Pipe empty"
                 break
-            
-            for i in range(len(arr)):
-                ln+=str(arr[i])
-                if not i == len(arr) - 1:
-                    ln+=' '
-            ln+='\n'
-            count+=1
-            if count > 15:
-                # write out accumulated lines
-                self.outFile.write(ln)
-                self.outFile.flush()
-                count = 0
-                ln=""
+            arr.tofile(self.outFile, sep=" ", format="%f")
+            self.outFile.write('\n')
             nrows-=1
-        self.outFile.write(ln)
-
         print "Output written to disk"
 
