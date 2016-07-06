@@ -172,7 +172,7 @@ class GPUCalculator(Process):
     def process_data(self):
         #GPU layout information
         #func = self.kernel.get_function("raster_function")
-        grid = (4,4)
+        grid = (16,16)
         block = (32,32,1)
         num_blocks = grid[0] * grid[1]
         threads_per_block = block[0]*block[1]*block[2]
@@ -204,11 +204,12 @@ class GPUCalculator(Process):
     """
     def write_data(self, count):
         #skip first and last rows, since they were buffers in the computation
-        for row in range(1, self.maxPossRows-1):
-            # see if written out more than total number of rows plus a small buffer
-            # pipe.send seems to sopt working after too many sends and nothing is taken off
-            if count + row > self.totalRows:
-                break
+        max = self.maxPossRows
+        # see if written out more than total number of rows plus a small buffer
+        # pipe.send seems to sopt working after too many sends and nothing is taken off
+        if count + max > self.totalRows:
+            max = self.totalRows - count
+        for row in range(1, max):
             self.outputPipe.send(self.from_gpu_buffer[row])
 
     """
