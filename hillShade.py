@@ -16,8 +16,8 @@ def main():
 	input_file.close()
 
 	#calculate slope and/or aspect and/or hillShade
-#	slope_output     = return_slope(data, cellsize, NODATA)
-#	aspect_output    = return_aspect(data, cellsize, NODATA)	
+	slope_output     = return_slope(data, cellsize, NODATA)
+	aspect_output    = return_aspect(data, cellsize, NODATA)	
 	hillShade_output = calc_hillShade(data, cellsize, NODATA)
 
 	#store header info into string variable
@@ -31,8 +31,8 @@ def main():
                  )
 
 	#output slope and/or aspect and/or hillShade info to output file
-#	np.savetxt("aiSlopeOutput.asc", slope_output, fmt='%5.2f', header=header_str, comments='')
-#	np.savetxt("aiAspectOutput.asc", aspect_output, fmt='%5.2f', header=header_str, comments='')
+	np.savetxt("aiSlopeOutput.asc", slope_output, fmt='%5.2f', header=header_str, comments='')
+	np.savetxt("aiAspectOutput.asc", aspect_output, fmt='%5.2f', header=header_str, comments='')
 	np.savetxt("aiHillShade.asc", hillShade_output, fmt='%5.2f', header=header_str, comments='')
 
 #calculate the hillShade from the data
@@ -51,26 +51,28 @@ def cell_shade(data, row, col, cellsize, NODATA):
 
 	#calculate zenith
 	altitude = 45
-	zenith_deg = (90 - altitude)
-	zenith_rad = (zenith_deg * (np.pi / 180.0))
+	zenith_deg = 90 - altitude
+	zenith_rad = zenith_deg * (np.pi / 180.0)
 	
 	#calculate azimuth	
 	azimuth = 315
-	azimuth_math = ((360.0 - azimuth) + 90)
+	azimuth_math = 360.0 - azimuth + 90
 	if azimuth_math >= 360.0:
 		azimuth_math = (azimuth_math - 360.0)
-	azimuth_rad = (azimuth_math * (np.pi / 180.0))
+	azimuth_rad = azimuth_math * (np.pi / 180.0)
 
 	#caluclate slope
 	slope = calc_slope(data, row, col, cellsize, NODATA)
 
 	#calculate aspect
-	aspect = calc_aspect(data, row, col, cellsize, NODATA)
+	aspect = calc_aspect_for_hillShade(data, row, col, cellsize, NODATA)
 
 	#calculate hillShade
-	hillShade = (255.0 * ((np.cos(zenith_rad) * np.cos(slope)) + (np.sin(zenith_rad) * np.sin(slope) \
-				* np.cos(azimuth_rad - aspect))))
+	hillShade = 255.0 * ((np.cos(zenith_rad) * np.cos(slope)) + (np.sin(zenith_rad) * np.sin(slope) \
+				* np.cos((azimuth_rad - aspect))))
 	
+	if hillShade < 0:
+		hillShade = 0
 
 	return hillShade
 
@@ -110,12 +112,45 @@ def return_aspect(data, cellsize, NODATA):
 	aspect_data = np.zeros_like(data)
 	for row in range(len(data)):
 		for col in range((len(data[0]))):
-			aspect_data[row][col] = calc_aspect(data, row, col, cellsize, NODATA)
+			aspect_data[row][col] = calc_aspect_for_aspect(data, row, col, cellsize, NODATA)
 
 	return aspect_data
 
-#caluclate the aspect for an individual cell
-def calc_aspect(data, row, col, cellsize, NODATA):
+#calculate the aspect for an individual cell for aspect
+def calc_aspect_for_aspect(data, row, col, cellsize, NODATA):
+	if data[row][col] == NODATA:
+		return NODATA
+
+	nbhd = []
+	for i in range(-1,2):
+		for j in range(-1,2):
+			if row+i<=0 or row+i>=len(data) or col+j>=len(data[0]) or data[row+i][col+j] == NODATA:
+				nbhd.append(NODATA)
+			else:
+				nbhd.append(data[row+i,col+j])
+
+	dz_dx = (nbhd[2] + 2*nbhd[5] + nbhd[8] - (nbhd[0] + 2*nbhd[3] + nbhd[6])) \
+				/ (8*cellsize)
+	dz_dy = (nbhd[6] + 2*nbhd[7] + nbhd[8] - (nbhd[0] + 2*nbhd[1] + nbhd[2])) \
+				/ (8*cellsize)
+	if dz_dx == NODATA or dz_dy == NODATA or (dz_dx == 0.0 and dz_dy == 0.0):
+		return NODATA
+	else:
+		aspect = (57.29578 * (np.arctan2(dz_dy, -(dz_dx))))     
+
+	        if aspect < 0:
+	                aspect = 90.0 - aspect
+        	elif aspect > 90.0:
+        	        aspect = 360.0 - aspect + 90.0
+       		else:
+        	        aspect = 90.0 - aspect
+
+       		aspect = (aspect * (np.pi / 180.0))
+
+	return aspect
+	
+#caluclate the aspect for an individual cell for hillShade
+def calc_aspect_for_hillShade(data, row, col, cellsize, NODATA):
 	if data[row][col] == NODATA:
 		return NODATA 
 	
@@ -131,19 +166,7 @@ def calc_aspect(data, row, col, cellsize, NODATA):
 				/ (8*cellsize)
 	dz_dy = (nbhd[6] + 2*nbhd[7] + nbhd[8] - (nbhd[0] + 2*nbhd[1] + nbhd[2])) \
 				/ (8*cellsize)
-		
-	aspect = (57.29578 * (np.arctan2(dz_dy, -(dz_dx))))	
-
-	if aspect < 0:
-		aspect = 90.0 - aspect
-	elif aspect > 90.0:
-		aspect = 360.0 - aspect + 90.0
-	else:
-		aspect = 90.0 - aspect
-
-	aspect = (aspect * (np.pi / 180.0))
-
-	'''	
+	
 	if dz_dx != 0:
 		aspect = np.arctan2(dz_dy, -(dz_dx))
 		if aspect < 0:
@@ -154,8 +177,7 @@ def calc_aspect(data, row, col, cellsize, NODATA):
 		elif dz_dy < 0:
 			aspect = ((2 * np.pi) - (np.pi / 2))
 		else:
-			aspect = aspect
-	'''
+			aspect = np.arctan2(dz_dy, -(dz_dx))
 	
 	return aspect
 

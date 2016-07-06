@@ -193,7 +193,12 @@ class GPUCalculator(Process):
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
+<<<<<<< HEAD
             (np.int32, 'function', self.getFunctionVal(funcType))
+=======
+            (np.float64, 'cellSize', self.cellsize),
+            (np.int32, 'function', self.getFunctionVal())
+>>>>>>> fd732016210c6d051d696d9a39f0e27e7af0c5cb
             ])
 
         stc.copy_to_gpu()
@@ -257,6 +262,7 @@ class GPUCalculator(Process):
                             unsigned long long ncols;
                             unsigned long long nrows;
                             unsigned long long npixels;
+                            double cellSize;
                             int function;
                     } passed_in;
 
@@ -292,15 +298,16 @@ class GPUCalculator(Process):
                     /*
                         GPU only function that calculates slope for a pixel
                     */
-                    __device__ double slope(double *nbhd, double dz_dx, double dz_dy){
+                    __device__ double slope(double dz_dx, double dz_dy){
                         return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
                     }
 
                     /*
                         GPU only function that calculates aspect for a pixel
                     */
-                    __device__ double aspect(double *nbhd, double dz_dx, double dz_dy){
-                        double aspect = (57.29578 * (atan2(dz_dy, -(dz_dx))));	
+                    __device__ double aspect(double dz_dx, double dz_dy){
+                        double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));	
+                        /*
 	                    if(aspect < 0){
 		                    aspect = 90.0 - aspect;
 	                    }else if(aspect > 90.0){
@@ -308,17 +315,48 @@ class GPUCalculator(Process):
 	                    }else{
 		                    aspect = 90.0 - aspect;
                         }
+                        */
+                        
+                        if(aspect > 90.0){
+                            aspect = 360.0 - aspect + 90.0;
+                        } else {
+                            aspect = 90.0 - aspect;
+                        }
+
 	                    aspect = aspect * (M_PI / 180.0);
+                        return aspect;
+                    }
+
+                    /*
+                        GPU only function that calculates aspect for a pixel
+                        to be ONLY used by hillshade
+                    */    
+                    __device__ double hillshade_aspect(double dz_dx, double dz_dy){
+                        double aspect;
+                        	if(dz_dx != 0){
+                        	    aspect = atan2(dz_dy, -(dz_dx));
+                        	    if(aspect < 0){
+                        	        aspect = ((2 * M_PI) + aspect);
+                                }
+                            } else if(dz_dx == 0){
+                            	if(dz_dy > 0){
+                        	        aspect = (M_PI / 2);
+                        	    }else if(dz_dy < 0){
+                        	        aspect = ((2 * M_PI) - (M_PI / 2));
+                        	    }else{
+                        	        aspect = atan2(dz_dy, -(dz_dx));
+                                }
+                            }
                         return aspect;
                     }
 
                     /*
                         GPU only function that calculates hillshade for a pixel
                     */
-                    __device__ double hillshade(double *nbhd, double dz_dx, double dz_dy){
+                    __device__ double hillshade(double dz_dx, double dz_dy){
                         /* calc slope and aspect */
-                        double slp = slope(nbhd, dz_dx, dz_dy);
-                        double asp = aspect(nbhd, dz_dx, dz_dy);
+                        double slp = slope(dz_dx, dz_dy);
+                        double asp = hillshade_aspect(dz_dx, dz_dy);
 
                         /* calc zenith */
 	                    double altitude = 45;
@@ -333,8 +371,8 @@ class GPUCalculator(Process):
                         }	
                         double azimuth_rad = (azimuth_math * M_PI / 180.0);
 
-                        double hs = 255.0 * ((cos(zenith_rad) * cos(slp)) + (sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp)));
-	
+                        double hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
+
 	                    if(hs < 0){
 		                    return 0;
                         } else {
@@ -372,18 +410,18 @@ class GPUCalculator(Process):
                                                     nbhd[q] = data[offset];
                                                 }
                                             }
-                                            double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*10);
-                                            double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*10);
+                                            double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8 * file_info -> cellSize);
+                                            double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8 * file_info -> cellSize);
                                             /* choose which function to execute */
                                             switch(file_info -> function){
                                                 case 0:
-                                                    result[offset] = slope(nbhd, dz_dx, dz_dy);
+                                                    result[offset] = slope(dz_dx, dz_dy);
                                                 break;
                                                 case 1:
-                                                    result[offset] = aspect(nbhd, dz_dx, dz_dy);
+                                                    result[offset] = aspect(dz_dx, dz_dy);
                                                 break;
                                                 case 2:
-                                                    result[offset] = hillshade(nbhd, dz_dx, dz_dy);
+                                                    result[offset] = hillshade(dz_dx, dz_dy);
                                                 break;                        
                                             }
                                         }

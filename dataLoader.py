@@ -13,8 +13,6 @@ Class that reads data from a given input file and passes it to a Pipe object
 designed to run as a separate process and inherits from Process module
 
 currently supported input file types: [GEOTiff (.tif), ESRI ASCII format (.asc)]
-
-ERROR: GEOTiff files do NOT work, they are corrupting at some point 
 """
 class dataLoader(Process):
 
@@ -60,21 +58,13 @@ class dataLoader(Process):
             self.cellsize = np.float64(self.open_file.readline().split()[1])
             self.NODATA = np.float64(self.open_file.readline().split()[1])
         elif ".tif" in self.file_name:
-            src_ds = gdal.Open(self.file_name) #open again to get GeoT info
-            srcband = self.open_file
-            print "here3"
-            GeoT = src_ds.GetGeoTransform()
-            print "here4"
-            # SEGMENTATION FAULT HERE
-            self.NODATA = srcband.GetNoDataValue()
-            print "here"
+            GeoT = self.open_file.GetGeoTransform()
+            self.NODATA = self.open_raster_band.GetNoDataValue()
             self.xllcorner = GeoT[0]
             self.yllcorner = GeoT[3]
-            src_ds = None
-            print "here2"
-            self.cellsize = self.open_file.GetScale()
-            self.totalRows = self.open_file.YSize
-            self.totalCols = self.open_file.XSize
+            self.cellsize = self.open_raster_band.GetScale()
+            self.totalRows = self.open_raster_band.YSize
+            self.totalCols = self.open_raster_band.XSize
   
     """
     _openFile
@@ -85,8 +75,10 @@ class dataLoader(Process):
         if ".asc" in self.file_name:
             self.open_file=open(self.file_name, 'r')
         elif ".tif" in self.file_name:
-            f = gdal.Open(self.file_name)
-            self.open_file = f.GetRasterBand(1)
+            self.open_file = gdal.Open(self.file_name)
+            self.open_raster_band = self.open_file.GetRasterBand(1)
+            self.dataType = self.open_raster_band.DataType
+            self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
 
     """
     stop 
@@ -115,12 +107,8 @@ class dataLoader(Process):
             f=self.open_file.readline().split()
         elif ".tif" in self.file_name:
             try:
-                # ERROR
-                # GDAL Raster File gets corrupted between opening and here
-                # DOES NOT WORK
-                print self.open_file.DataType
-                print gdal.GetDataTypeName(self.open_file.DataType)
-                f=struct.unpack(fmttypes[gdal.GetDataTypeName(self.open_file.DataType)]*self.totalCols, srcband.ReadRaster(0,row,srcband.XSize,1, buf_type=self.open_file.DataType))
+                f=struct.unpack(self.unpackVal, self.open_raster_band.ReadRaster(0,row,self.totalCols,1, buf_type=self.dataType))
+            # EOF
             except RuntimeError:
                 f=[]   
         return np.float64(f)
