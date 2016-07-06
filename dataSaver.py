@@ -105,5 +105,5 @@ class dataSaver(Process):
             arr.tofile(self.outFile, sep=" ", format="%f")
             self.outFile.write('\n')
             nrows-=1
-        print "Output written to disk"
+        print "Output %s written to disk" % self.fileName
 

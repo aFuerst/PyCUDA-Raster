@@ -25,7 +25,7 @@ class GPUCalculator(Process):
 
     creates empty instance variables needed later
     """
-    def __init__(self, header, _inputPipe, _outputPipe, functionType):
+    def __init__(self, header, _inputPipe, _outputPipes, functionTypes):
         Process.__init__(self)
 
         # CUDA device info
@@ -33,8 +33,8 @@ class GPUCalculator(Process):
         self.context = None
 
         self.inputPipe = _inputPipe
-        self.outputPipe = _outputPipe 
-        self.functionName = functionType
+        self.outputPipes = _outputPipes 
+        self.functions = functionTypes
     
         #unpack header info
         self.totalCols = header[0]
@@ -80,13 +80,22 @@ class GPUCalculator(Process):
         #Process data while we continue to receive input
         count = 0
         while self.recv_data(count):
-            self.process_data()
-            self.write_data(count)
+            #Copy input data to GPU
+            cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
+            for i in range(len(self.functions)):
+                self.process_data(self.functions[i])
+                #Get data back from GPU
+                cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
+                self.write_data(count, self.outputPipes[i])
+
             count += (self.maxPossRows-2)  # -2 because of buffer rows
             print "Page done..."
         #Process remaining data in buffer
-        self.process_data()
-        self.write_data(count)
+        cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
+        for i in range(len(self.functions)):
+            self.process_data(self.functions[i])
+            cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
+            self.write_data(count, self.outputPipes[i])
 
         print "GPU calculations finished"
 
@@ -169,9 +178,8 @@ class GPUCalculator(Process):
     copies input data from a pagelocked buffer, runs the kernel and copies 
     the output to a second pagelocked buffer
     """
-    def process_data(self):
+    def process_data(self, funcType):
         #GPU layout information
-        #func = self.kernel.get_function("raster_function")
         grid = (16,16)
         block = (32,32,1)
         num_blocks = grid[0] * grid[1]
@@ -185,24 +193,20 @@ class GPUCalculator(Process):
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
-            (np.int32, 'function', self.getFunctionVal())
+            (np.int32, 'function', self.getFunctionVal(funcType))
             ])
 
         stc.copy_to_gpu()
 
-        #Copy input data to GPU
-        cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         #Call GPU kernel
         self.func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
-        #Get data back from GPU
-        cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
 
-    def getFunctionVal(self):
-        if self.functionName == "slope":
+    def getFunctionVal(self, func):
+        if func == "slope":
             return 0        
-        elif self.functionName == "aspect":
+        elif func == "aspect":
             return 1
-        elif self.functionName == "hillshade":
+        elif func == "hillshade":
             return 2
 
     """
@@ -210,7 +214,7 @@ class GPUCalculator(Process):
 
     Writes results to output pipe. This pipe goes to dataSaver.py
     """
-    def write_data(self, count):
+    def write_data(self, count, outPipe):
         #skip first and last rows, since they were buffers in the computation
         max = self.maxPossRows
         # see if written out more than total number of rows plus a small buffer
@@ -218,7 +222,7 @@ class GPUCalculator(Process):
         if count + max > self.totalRows:
             max = self.totalRows - count
         for row in range(1, max):
-            self.outputPipe.send(self.from_gpu_buffer[row])
+            outPipe.send(self.from_gpu_buffer[row])
 
     """
     stop 
