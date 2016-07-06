@@ -1,6 +1,5 @@
 import dataLoader, gpuCalc, dataSaver
 import numpy as np
-
 from multiprocessing import Process, Pipe
 from sys import argv
 

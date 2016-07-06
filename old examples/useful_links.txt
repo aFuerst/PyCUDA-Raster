@@ -11,3 +11,6 @@ http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
 https://documen.tician.de/pycuda/
 
 http://stackoverflow.com/questions/26913683/different-way-to-index-threads-in-cuda-c
+
+# extend process example
+https://gist.github.com/lebedov/2360424
