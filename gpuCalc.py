@@ -11,7 +11,7 @@ GPUCalculator
 Class that takes and sends data from pipes and goes GPU calculations on it
 designed to run as a separate process and inherits from Process module
 
-currently supported functions: slope
+currently supported functions: slope, aspect, hillshade
 """
 class GPUCalculator(Process):
   
@@ -25,7 +25,7 @@ class GPUCalculator(Process):
 
     creates empty instance variables needed later
     """
-    def __init__(self, header, _inputPipe, _outputPipe):
+    def __init__(self, header, _inputPipe, _outputPipe, functionType):
         Process.__init__(self)
 
         # CUDA device info
@@ -34,7 +34,8 @@ class GPUCalculator(Process):
 
         self.inputPipe = _inputPipe
         self.outputPipe = _outputPipe 
-
+        self.functionName = functionType
+    
         #unpack header info
         self.totalCols = header[0]
         self.totalRows = header[1]
@@ -73,7 +74,7 @@ class GPUCalculator(Process):
 
         self._gpuAlloc()
 
-        self.kernel = self.get_kernel(kernelType)
+        self.kernel = self.get_kernel()
         self.func = self.kernel.get_function("raster_function")
 
         #Process data while we continue to receive input
@@ -185,6 +186,7 @@ class GPUCalculator(Process):
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
+            (np.int32, 'function', self.getFunctionVal())
             ])
 
         stc.copy_to_gpu()
@@ -196,6 +198,13 @@ class GPUCalculator(Process):
         #Get data back from GPU
         cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
 
+    def getFunctionVal(self):
+        if self.functionName == "slope":
+            return 0        
+        elif self.functionName == "aspect":
+            return 1
+        elif self.functionName == "hillshade":
+            return 2
 
     """
     write_data
@@ -234,9 +243,8 @@ class GPUCalculator(Process):
     # HOWEVER, recv_data is set up so that the last two rows of the preceeding
     # page are used as the first two in the current one. This ensures that the
     # last row of the preceeding page will still be analyzed.
-    def get_kernel(self, kernelType):
-        if kernelType == 'simple slope':
-            mod = SourceModule("""
+    def get_kernel(self):
+        mod = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>
 
@@ -246,10 +254,11 @@ class GPUCalculator(Process):
                             unsigned long long ncols;
                             unsigned long long nrows;
                             unsigned long long npixels;
+                            int function;
                     } passed_in;
 
                     /************************************************************************************************
-                            GPU only function that gets the neighbors of the pixel at curr_offset
+                            GPU only function that gets the neighbors of the pixel at offset
                             stores them in the passed-by-reference array 'store'
                     ************************************************************************************************/
                     __device__ int getKernel(double *store, double *data, unsigned long offset, passed_in *file_info){
@@ -277,6 +286,59 @@ class GPUCalculator(Process):
                             return 0;
                     }
 
+                    /*
+                        GPU only function that calculates slope for a pixel
+                    */
+                    __device__ double slope(double *nbhd, double dz_dx, double dz_dy){
+                        return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
+                    }
+
+                    /*
+                        GPU only function that calculates aspect for a pixel
+                    */
+                    __device__ double aspect(double *nbhd, double dz_dx, double dz_dy){
+                        double aspect = (57.29578 * (atan2(dz_dy, -(dz_dx))));	
+	                    if(aspect < 0){
+		                    aspect = 90.0 - aspect;
+	                    }else if(aspect > 90.0){
+		                    aspect = 360.0 - aspect + 90.0;
+	                    }else{
+		                    aspect = 90.0 - aspect;
+                        }
+	                    aspect = aspect * (M_PI / 180.0);
+                        return aspect;
+                    }
+
+                    /*
+                        GPU only function that calculates hillshade for a pixel
+                    */
+                    __device__ double hillshade(double *nbhd, double dz_dx, double dz_dy){
+                        /* calc slope and aspect */
+                        double slp = slope(nbhd, dz_dx, dz_dy);
+                        double asp = aspect(nbhd, dz_dx, dz_dy);
+
+                        /* calc zenith */
+	                    double altitude = 45;
+	                    double zenith_deg = 90 - altitude;
+	                    double zenith_rad = zenith_deg * (M_PI / 180.0);
+	
+                        /* calc azimuth */
+	                    double azimuth = 315;
+	                    double azimuth_math = (360 - azimuth + 90);
+	                    if(azimuth_math >= 360.0){
+		                    azimuth_math = azimuth_math - 360;
+                        }	
+                        double azimuth_rad = (azimuth_math * M_PI / 180.0);
+
+                        double hs = 255.0 * ((cos(zenith_rad) * cos(slp)) + (sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp)));
+	
+	                    if(hs < 0){
+		                    return 0;
+                        } else {
+                            return hs;
+                        }
+                    }
+
                     /************************************************************************************************
                             CUDA Kernel function to calculate the slope of pixels in 'data' and stores them in 'result'
                             handles a variable number of calculations based on its thread/block location 
@@ -296,30 +358,37 @@ class GPUCalculator(Process):
                             /* do npixels + 1 to make last row(s) get done */
                             for(i=0; i < file_info -> pixels_per_thread + 1 && offset < file_info -> npixels; ++i){	    
                                     if(data[offset] == file_info -> NODATA){
-                                            result[offset] = file_info -> NODATA;
+                                        result[offset] = file_info -> NODATA;
                                     } else {
-                                            int q = getKernel(nbhd, data, offset, file_info);
-                                            if (q) {
-                                                    result[offset] = file_info->NODATA;
+                                        int q = getKernel(nbhd, data, offset, file_info);
+                                        if (q) {
+                                            result[offset] = file_info->NODATA;
+                                        } else {
+                                            for(q = 0; q < 9; ++q){
+                                                if(nbhd[q] == file_info -> NODATA){
+                                                    nbhd[q] = data[offset];
+                                                }
                                             }
-                                            else{
-                                                    for(q = 0; q < 9; ++q){
-                                                            if(nbhd[q] == file_info -> NODATA){
-                                                                    nbhd[q] = data[offset];
-                                                            }
-                                                    }
-                                                    double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*10);
-                                                    double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*10);
-                                                    result[offset] = atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
+                                            double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*10);
+                                            double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*10);
+                                            /* choose which function to execute */
+                                            switch(file_info -> function){
+                                                case 0:
+                                                    result[offset] = slope(nbhd, dz_dx, dz_dy);
+                                                break;
+                                                case 1:
+                                                    result[offset] = aspect(nbhd, dz_dx, dz_dy);
+                                                break;
+                                                case 2:
+                                                    result[offset] = hillshade(nbhd, dz_dx, dz_dy);
+                                                break;                        
                                             }
+                                        }
                                     }
                                     offset += (gridDim.x*blockDim.x) * (gridDim.y*blockDim.y);
                                     //Jump to next row
-
                             }
                     }
                     """)
-            return mod
-        else:
-            print "CUDA kernel not implemented"
-            self.stop()
+        return mod
+
