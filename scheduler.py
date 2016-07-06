@@ -4,14 +4,14 @@ import numpy as np
 from multiprocessing import Process, Pipe
 from sys import argv
 
-def run(inputFile, outputFile):
+def run(inputFile, outputFile, functionName):
     # create input and output pipes    
     inputPipe = Pipe()
     outputPipe = Pipe()
 
     loader = dataLoader.dataLoader(inputFile, inputPipe[0])
     header = loader.getHeaderInfo()
-    calc = gpuCalc.GPUCalculator(header, inputPipe[1], outputPipe[0])
+    calc = gpuCalc.GPUCalculator(header, inputPipe[1], outputPipe[0], functionName)
     saver = dataSaver.dataSaver(outputFile, header, outputPipe[1])
 
     # start all threads
@@ -26,4 +26,4 @@ def run(inputFile, outputFile):
 
 if __name__ == '__main__':
     print argv
-    run(argv[1], argv[2])
+    run(argv[1], argv[2], argv[3])
