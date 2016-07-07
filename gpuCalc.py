@@ -234,7 +234,9 @@ class GPUCalculator(Process):
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping..."
+        print "Stopping gpuCalc..."
+        self.data_gpu.free()
+        self.result_gpu.free()
         exit(1)
 
     """

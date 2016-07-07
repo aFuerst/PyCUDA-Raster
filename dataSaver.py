@@ -53,7 +53,7 @@ class dataSaver(Process):
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping..."
+        print "Stopping saver..."
         exit(1)
 
     """
@@ -98,10 +98,15 @@ class dataSaver(Process):
         while nrows > 0:
             # get line from pipe
             try:
-                arr=self.input_pipe.recv()
+                #arr=self.input_pipe.recv()
+                if self.input_pipe.poll(5):
+                    arr=self.input_pipe.recv()
+                else:
+                    # end of file reached
+                    raise EOFError
             except EOFError:
                 print "Pipe empty"
-                break
+                return
             arr.tofile(self.outFile, sep=" ", format="%f")
             self.outFile.write('\n')
             nrows-=1

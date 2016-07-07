@@ -2,7 +2,6 @@ import dataLoader, gpuCalc, dataSaver
 import numpy as np
 
 from multiprocessing import Process, Pipe, active_children
-from sys import argv
 from time import sleep
 
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
@@ -30,12 +29,25 @@ def run(inputFile, outputFiles, functions):
     
     # join all threads
     while active_children():
-        sleep(5)
+        if loader.exitcode != 0:
+            calc.stop()
+            for saver in savers:
+                saver.stop()
+            print "Error encountered in data loader, ending tasks"
+            break
+        if calc.exitcode != 0:
+            loader.stop()
+            for saver in savers:
+                saver.stop()
+            print "Error encountered in GPU calculater, ending tasks"
+            break
+        sleep(1)
     #loader.join()
     #calc.join()
     #saver.join()
 
 if __name__ == '__main__':
+    from sys import argv
     outFiles = []
     funcs = []
     for i in range(2,len(argv),2):

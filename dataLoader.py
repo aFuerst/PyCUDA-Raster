@@ -86,7 +86,7 @@ class dataLoader(Process):
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping..."
+        print "Stopping loader..."
         exit(1)
 
     """
