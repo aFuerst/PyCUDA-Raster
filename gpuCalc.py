@@ -209,6 +209,9 @@ class GPUCalculator(Process):
             return 1
         elif func == "hillshade":
             return 2
+        else:
+            print "Illegal function chosen"
+            raise NotImplemented
 
     """
     write_data
@@ -407,7 +410,7 @@ class GPUCalculator(Process):
                                                     result[offset] = slope(dz_dx, dz_dy);
                                                 break;
                                                 case 1:
-                                                    result[offset] = aspect(dz_dx, dz_dy);
+                                                    result[offset] = aspect(dz_dx, dz_dy, file_info -> NODATA);
                                                 break;
                                                 case 2:
                                                     result[offset] = hillshade(dz_dx, dz_dy);

@@ -40,5 +40,5 @@ if __name__ == '__main__':
     funcs = []
     for i in range(2,len(argv),2):
         outFiles.append(argv[i])
-        funcs.append(argv[i+1])
+        funcs.append(argv[i+1].lower())
     run(argv[1], outFiles, funcs)
