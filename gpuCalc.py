@@ -301,27 +301,20 @@ class GPUCalculator(Process):
                     /*
                         GPU only function that calculates aspect for a pixel
                     */
-                    __device__ double aspect(double dz_dx, double dz_dy){
-                        double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));	
-                        /*
-	                    if(aspect < 0){
-		                    aspect = 90.0 - aspect;
-	                    }else if(aspect > 90.0){
-		                    aspect = 360.0 - aspect + 90.0;
-	                    }else{
-		                    aspect = 90.0 - aspect;
+                    __device__ double aspect(double dz_dx, double dz_dy, double NODATA){
+                        double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
+                        if(dz_dx == NODATA || dz_dy == NODATA || (dz_dx == 0.0 && dz_dy == 0.0)){
+                            return NODATA;
+                        } else{
+                            if(aspect > 90.0){
+                                aspect = 360.0 - aspect + 90.0;
+                            } else {
+                                aspect = 90.0 - aspect;
+                            }
+                                aspect = aspect * (M_PI / 180.0);
+                                return aspect;
+                            }
                         }
-                        */
-                        
-                        if(aspect > 90.0){
-                            aspect = 360.0 - aspect + 90.0;
-                        } else {
-                            aspect = 90.0 - aspect;
-                        }
-
-	                    aspect = aspect * (M_PI / 180.0);
-                        return aspect;
-                    }
 
                     /*
                         GPU only function that calculates aspect for a pixel
