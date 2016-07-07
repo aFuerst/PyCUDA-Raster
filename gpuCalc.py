@@ -193,12 +193,8 @@ class GPUCalculator(Process):
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
-<<<<<<< HEAD
-            (np.int32, 'function', self.getFunctionVal(funcType))
-=======
             (np.float64, 'cellSize', self.cellsize),
-            (np.int32, 'function', self.getFunctionVal())
->>>>>>> fd732016210c6d051d696d9a39f0e27e7af0c5cb
+            (np.int32, 'function', self.getFunctionVal(funcType))
             ])
 
         stc.copy_to_gpu()
