@@ -14,7 +14,7 @@
 class dataLoader{
 
     public:
-        dataLoader(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *uffer_available, boost::mutex *buffer_lock);
+        dataLoader(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available, boost::mutex *buffer_lock);
         std::string getHeader(void);
 
     private:
