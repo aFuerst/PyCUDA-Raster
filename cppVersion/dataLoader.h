@@ -9,16 +9,17 @@
 #include <iterator>
 #include <boost/thread.hpp>
 #include <deque>
+#include <sstream>
 
 class dataLoader{
 
     public:
-        dataLoader(string fileName);
-        string getHeader(void);
+        dataLoader(std::string fileName);
+        std::string getHeader(void);
 
     private:
         void readHeader();
-        string readLine();
+        std::vector<double> readLine();
         void openFile();
 
         long long ncols;
@@ -28,53 +29,76 @@ class dataLoader{
         long long xllcorner;
         long long yllcorner;
 
-        string header;
-        string fileName;
+        std::string fileName;
+        std::ifstream inFile;
+};
+
+dataLoader::dataLoader(std::string fileName){
+    this -> fileName = fileName;
+    openFile();
 }
 
-dataLoader::dataLoader(string fileName){
-    this.fileName = fileName;
+std::string dataLoader::getHeader(){
+    std::stringstream s;
+    s << "ncols = " << ncols << "\n";
+    s << "nrows = " << nrows << "\n";
+    s << "cellsize = " << cellsize << "\n";
+    s << "NODATA = " << nodata << "\n";
+    s << "xllcorner = " << xllcorner << "\n";
+    s << "yllcorner = " << yllcorner << "\n";
+    return s.str();
 }
 
-dataLoader::readHeader(){
-	int count = 0;
-    string header;
+void dataLoader::openFile(){
+    inFile.open(fileName.c_str());
+    if(!inFile.is_open()) {
+        std::cerr << "File failed to open" << "\n";
+        exit(1);
+    }
+}
+
+std::vector<double> dataLoader::readLine(){
+    std::string x;
+    std::vector<double> row;
+    while(std::getline(inFile, x, ' ')) {
+        row.push_back(atof(x.c_str()));
+    }
+    return row;
+}
+
+void dataLoader::readHeader(){
+    int temp, count;
+	temp = count = 0;
+    std::string header;
 	//reading lines of header and saving keyvalues into global variables
 	while (count < 6){
-		getline(*inFile, header);
+		std::getline(inFile, header);
 		if(count == 0){
-            temp = 0;
-            while(header[temp] != '='){
-                
-            }
-			ncols = atoi(keyValues[1].c_str());
+            while(header[temp++] != '='){}
+			ncols = atol(header.substr(temp+1, header.length()-1).c_str());
 
 		} else if(count == 1){
-			istringstream headLine(header[count]);
-            copy(istream_iterator<string>(headLine), istream_iterator<string>(), back_inserter(keyValues));
-            nrows = atoi(keyValues[3].c_str());
+            while(header[temp++] != '='){}
+            nrows = atol(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 2){
-			istringstream headLine(header[count]);
-            copy(istream_iterator<string>(headLine), istream_iterator<string>(), back_inserter(keyValues));
-            xllcorner = atoi(keyValues[5].c_str());
+            while(header[temp++] != '='){}
+            xllcorner = atol(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 3){
-		    istringstream headLine(header[count]);
-            copy(istream_iterator<string>(headLine), istream_iterator<string>(), back_inserter(keyValues));
-            yllcorner = atoi(keyValues[7].c_str());
+            while(header[temp++] != '='){}
+            yllcorner = atol(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 4){
-			istringstream headLine(header[count]);
-            copy(istream_iterator<string>(headLine), istream_iterator<string>(), back_inserter(keyValues));
-            cellsize = atof(keyValues[9].c_str());
+            while(header[temp++] != '='){}
+            cellsize = atof(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 5){
-			istringstream headLine(header[count]);
-            copy(istream_iterator<string>(headLine), istream_iterator<string>(), back_inserter(keyValues));
-            nodata = atof(keyValues[11].c_str());
+            while(header[temp++] != '='){}
+            nodata = atof(header.substr(temp+1, header.length()-1).c_str());
         }
-     ++count;
+    temp = 0;
+    ++count;
 	}
 }
 

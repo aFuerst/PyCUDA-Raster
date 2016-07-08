@@ -96,10 +96,11 @@ class dataSaver(Process):
     def write_func(self):
         nrows = self.totalRows
         while nrows > 0:
+            #print nrows
             # get line from pipe
             try:
                 #arr=self.input_pipe.recv()
-                if self.input_pipe.poll(5):
+                if self.input_pipe.poll(50):
                     arr=self.input_pipe.recv()
                 else:
                     # end of file reached

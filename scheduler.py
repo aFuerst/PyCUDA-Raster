@@ -26,16 +26,16 @@ def run(inputFile, outputFiles, functions):
     calc.start()
     for i in range(len(outputFiles)):
         savers[i].start()
-    
+
     # join all threads
     while active_children():
-        if loader.exitcode != 0:
+        if loader.exitcode != None and loader.exitcode != 0:
+            print "Error encountered in data loader, ending tasks"            
             calc.stop()
             for saver in savers:
                 saver.stop()
-            print "Error encountered in data loader, ending tasks"
             break
-        if calc.exitcode != 0:
+        if calc.exitcode != None and calc.exitcode != 0:
             loader.stop()
             for saver in savers:
                 saver.stop()
