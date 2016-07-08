@@ -26,7 +26,7 @@ CC = g++
 LIBS = -lboost_system -lboost_thread
 
 # define the C source files
-SRCS = dataLoader.cpp dataSaver.cpp serialCalc.cpp scheduler.cpp
+SRCS = dataLoader.cpp dataSaver.cpp serialCalc.cpp main.cpp
 
 # define the C object files 
 #
