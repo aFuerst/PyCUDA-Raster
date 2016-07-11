@@ -61,6 +61,23 @@ esriHeader getHeader(std::string fileName){
     return toReturn;
 }
 
+void load_func(std::string inFile, std::deque< std::deque <double> >* loadBuffer, 
+        boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
+    dataLoader loader(inFile, loadBuffer, buffer_available, buffer_lock);
+    return;
+}
+
+void calc_func(std::deque< std::deque <double> >* loadBuffer, std::vector< std::string > functions, esriHeader* header,
+        boost::condition_variable_any* load_buffer_available, boost::mutex* load_buffer_lock, 
+        std::vector< std::deque< std::deque <double> >* >* outBuffers, std::vector< boost::condition_variable_any* >* buffer_available_list, std::vector< boost::mutex* >* buffer_lock_list){
+    return;
+}
+
+void save_func(std::string outFile ,std::deque< std::deque <double> >* saveBuffer, esriHeader* header, 
+        boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
+    return;
+}
+
 int main(int argc, char* argv[]){
     std::vector< std::string > outFiles;
     std::vector< std::string > functions;
@@ -72,31 +89,30 @@ int main(int argc, char* argv[]){
     std::cout << argv[1] << "\n";
     esriHeader header = getHeader(argv[1]);
 
-    //for (int i=0; i<outFiles.size(); i++){
-    //    std::cout << outFiles.at(i) << std::endl;
-    //    std::cout << functions.at(i) << std::endl;
-    //}
+    for (int i=0; i<outFiles.size(); i++){
+        std::cout << outFiles.at(i) << std::endl;
+        std::cout << functions.at(i) << std::endl;
+    }
 
-    //std::deque< std::deque <double> >* loadBuffer = new std::deque< std::deque <double> >;
-    //boost::thread loadThread(argv[1], loadBuffer);
+    boost::condition_variable_any load_buffer_available;
+    boost::mutex load_buffer_lock;
 
-    //std::vector< std::deque< std::deque <double> >* > outBuffers;
-    //for (int i=0; i<outFiles.size(); i++){
-    //    outBuffers.push_back(new std::deque< std::deque <double> >);
-    //}
-    //boost::thread calcThread(loadBuffer);
+    std::deque< std::deque <double> >* loadBuffer = new std::deque< std::deque <double> >;
+    boost::thread loadThread(load_func, argv[1], loadBuffer, &load_buffer_available, &load_buffer_lock);
+
+    std::vector< std::deque< std::deque <double> >* > outBuffers;
+    std::vector< boost::condition_variable_any* > buffer_available_list;
+    std::vector< boost::mutex* > buffer_lock_list;
+
+    for (int i=0; i<outFiles.size(); i++){
+        outBuffers.push_back(new std::deque< std::deque <double> >);
+        buffer_available_list.push_back(new boost::condition_variable_any);
+        buffer_lock_list.push_back(new boost::mutex);
+        boost::thread saveThread(save_func, outFiles[i], outBuffers.at(i), &header, buffer_available_list.at(i), buffer_lock_list.at(i));
+    }
+
+    boost::thread calcThread(calc_func, loadBuffer, functions, &header, &load_buffer_available, &load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
 
     return 0;
 }
 
-void loadThread(){
-    return;
-}
-
-void calcThread(){
-    return;
-}
-
-void saveThread(){
-    return;
-}

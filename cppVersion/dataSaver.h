@@ -1,3 +1,6 @@
+#ifndef DATASAVER
+#define DATASAVER
+
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
@@ -28,3 +31,5 @@ private:
 	boost::mutex *buffer_lock;
     esriHeader header;
 };
+
+#endif

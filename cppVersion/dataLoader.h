@@ -1,3 +1,6 @@
+#ifndef DATALOADER
+#define DATALOADER
+
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
@@ -35,3 +38,5 @@ class dataLoader{
         boost::condition_variable_any *buffer_available;
         boost::mutex *buffer_lock;
 };
+
+#endif

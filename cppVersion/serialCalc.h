@@ -1,3 +1,6 @@
+#ifndef SERIALCALC
+#define SERIALCALC
+
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
@@ -31,3 +34,5 @@ private:
     double calc_slope(std::deque< std::deque <double> >* cur_lines, int col);
     void run_func();
 };
+
+#endif
