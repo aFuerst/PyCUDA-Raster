@@ -84,27 +84,27 @@ void dataLoader::readHeader(){
 	while (count < 6){
 		std::getline(inFile, header);
 		if(count == 0){
-            while(header[temp++] != '='){}
+            while(header[temp++] != ' '){}
 			ncols = atol(header.substr(temp+1, header.length()-1).c_str());
 
 		} else if(count == 1){
-            while(header[temp++] != '='){}
+            while(header[temp++] != ' '){}
             nrows = atol(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 2){
-            while(header[temp++] != '='){}
+            while(header[temp++] != ' '){}
             xllcorner = atol(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 3){
-            while(header[temp++] != '='){}
+            while(header[temp++] != ' '){}
             yllcorner = atol(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 4){
-            while(header[temp++] != '='){}
+            while(header[temp++] != ' '){}
             cellsize = atof(header.substr(temp+1, header.length()-1).c_str());
 
         } else if(count == 5){
-            while(header[temp++] != '='){}
+            while(header[temp++] != ' '){}
             nodata = atof(header.substr(temp+1, header.length()-1).c_str());
         }
     temp = 0;

@@ -31,27 +31,27 @@ esriHeader getHeader(std::string fileName){
     while (count < 6){
         std::getline(inFile, *header);
         if(count == 0){
-            while(header->at(temp++) != '='){}
+            while(header->at(temp++) != ' '){}
             toReturn.ncols = atol(header->substr(temp+1, header->length()-1).c_str());
 
         } else if(count == 1){
-            while(header->at(temp++) != '='){}
+            while(header->at(temp++) != ' '){}
             toReturn.nrows = atol(header->substr(temp+1, header->length()-1).c_str());
 
         } else if(count == 2){
-            while(header->at(temp++) != '='){}
+            while(header->at(temp++) != ' '){}
             toReturn.xllcorner = atol(header->substr(temp+1, header->length()-1).c_str());
 
         } else if(count == 3){
-            while(header->at(temp++) != '='){}
+            while(header->at(temp++) != ' '){}
             toReturn.yllcorner = atol(header->substr(temp+1, header->length()-1).c_str());
 
         } else if(count == 4){
-            while(header->at(temp++) != '='){}
+            while(header->at(temp++) != ' '){}
             toReturn.cellsize = atof(header->substr(temp+1, header->length()-1).c_str());
 
         } else if(count == 5){
-            while(header->at(temp++) != '='){}
+            while(header->at(temp++) != ' '){}
             toReturn.NODATA = atof(header->substr(temp+1, header->length()-1).c_str());
         }
         temp = 0;
