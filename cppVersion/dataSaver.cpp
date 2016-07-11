@@ -72,7 +72,7 @@ void dataSaver::write_func(ofStream* outFile)
 	//write out the first row
 	for(i = 0; i < esriHeader.ncols; i++)
 	{
-			*outFile << 
+			*outFile << //need to figure out what command to call here to write to outfile
 	}
 	*outFile << endl;
 	//enter main while loop
@@ -93,7 +93,7 @@ void dataSaver::write_func(ofStream* outFile)
 		count++;
 		for(i = 0; i < esriheaderncols; i++)
 		{
-			*outFile << 
+			*outFile << //need to figure out what command to call here to write to outfile
 		}
 		*outFile << endl;
 	}
@@ -103,7 +103,7 @@ void dataSaver::write_func(ofStream* outFile)
 	//write out the last row
 	for(i = 0; i < esriHeader.ncols; i++)
 	{
-		*outFile <<
+		*outFile << //need to figure out what command to call here to write to outfile
 	}
 	*outFile << endl;
 }
