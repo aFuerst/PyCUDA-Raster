@@ -7,19 +7,20 @@
 #include <vector>
 #include <algorithm>
 #include <iterator>
-#include <boost/thread.cpp>
+#include <boost/thread.hpp>
 #include <deque>
 #include <sstream>
 #include "dataSaver.h"
 #include "esriHeader.h"
 
-dataSaver::dataSaver(std::string fileName, std::deque <double> > *buffer, boost::condition_variable_any *buffer_available,
-		 boost::mutex *buffer_lock)
+dataSaver::dataSaver(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available,
+		 boost::mutex *buffer_lock, esriHeader header)
 {
 	this -> fileName = fileName;
 	this -> buffer = buffer;
 	this -> buffer_available = buffer_available;
 	this -> buffer_lock = buffer_lock;
+    this -> header = header;
 	openFile();
 }
 
@@ -27,83 +28,55 @@ dataSaver::dataSaver(std::string fileName, std::deque <double> > *buffer, boost:
 void dataSaver::openFile()
 {
 	//open outputfile
-	outFile.open(fileName.c_str())
+	outFile.open(fileName.c_str());
 	if (!outFile.is_open())
 	{
-		std::cerr << "File failed to open" << endl;
+		std::cerr << "File failed to open" << std::endl;
 		exit(1);	
 	}
 	//write header info to outputfile
-	outFile << "ncols "        << esriHeader.ncols     << endl;
-	outFile << "nrows "        << esriHeader.nrows     << endl;
-	outFile << "xllcorner "    << esriHeader.xllcorner << endl;
-	outFile << "yllcorner "    << esriHeader.yllcorner << endl;
-	outFile << "cellsize "     << esriHeader.cellsize  << endl;
-	outFile << "NODATA_value " << esriHeader.NODATA    << endl;
+	outFile << "ncols "        << header.ncols     << '\n';
+	outFile << "nrows "        << header.nrows     << '\n';
+	outFile << "xllcorner "    << header.xllcorner << '\n';
+	outFile << "yllcorner "    << header.yllcorner << '\n';
+	outFile << "cellsize "     << header.cellsize  << '\n';
+	outFile << "NODATA_value " << header.NODATA    << '\n';
 
 	write_func(&outFile);
 }
 
 //write data to the output file
-void dataSaver::write_func(ofStream* outFile)
+void dataSaver::write_func(std::ofstream* outFile)
 {
-	deque< deque <double> >* cur_lines = new deque< deque < double> >;
+	std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque < double> >;
 	int count = 0;
 	int i;
-	//first push back NODATA row for first row
-	curr_lines -> push_back(deque<double> (esriHeader.ncols, esriHeader.NODATA));
-	//next, grab first two rows of data
-	for(i = 0; i < 2; i++)
-	{
-		//LOCK
-		boost::mutex::scoped_lock lock(buffer_lock);
-		while(buffer.size() == 0)
-		{
-			buffer_available.wait(buffer_lock);
-		}
-		//don't pop anything from curr_lines yet, need to fill with three rows
-		curr_lines -> push_back(buffer.front());
-		buffer.pop_front();
-		buffer_available.notify_one();
-		buffer_lock.unlock();
-		//UNLOCK
-		count++;
-	}
-	//write out the first row
-	for(i = 0; i < esriHeader.ncols; i++)
-	{
-			*outFile << //need to figure out what command to call here to write to outfile
-	}
-	*outFile << endl;
 	//enter main while loop
-	while(count < esriHeader.nrows)
+	while(count < header.nrows)
 	{
-		curr_lines -> pop_front();
 		//LOCK
-		boost::mutex::scoped_lock lock(buffer_lock);
-		while(buffer.size() == 0)
+		boost::mutex::scoped_lock lock(*buffer_lock);
+		while(buffer -> size() == 0)
 		{
-			buffer_available.wait(buffer_lock);
+			buffer_available -> wait(*buffer_lock);
 		}
-		curr_lines -> puch_back(buffer.front());
-		buffer.pop_front();
-		buffer_available.notify_one();
-		buffer_lock.unlock();
+        // grab as many rows as are in buffer
+        for(i = 0; i < buffer -> size(); ++i){
+            cur_lines -> push_back(buffer -> front());
+            buffer -> pop_front();
+            ++count;
+        }
+		buffer_available -> notify_one();
+		buffer_lock -> unlock();
 		//UNLOCK
-		count++;
-		for(i = 0; i < esriheaderncols; i++)
-		{
-			*outFile << //need to figure out what command to call here to write to outfile
-		}
-		*outFile << endl;
-	}
-	//push back another NODATA row to write the last row
-	curr_lines -> pop_front();
-	curr_lines -> push_back(deque<double> (esriHeader.ncols, esriHeader.NODATA));
-	//write out the last row
-	for(i = 0; i < esriHeader.ncols; i++)
-	{
-		*outFile << //need to figure out what command to call here to write to outfile
-	}
-	*outFile << endl;
+        for(i = 0; i < cur_lines -> size(); ++i){
+    		for(int q = 0; q < header.ncols; ++q)
+	    	{
+	    		*outFile << cur_lines -> front().at(q); //need to figure out what command to call here to write to outfile
+	    	}
+	    	*outFile << '\n';
+            cur_lines -> pop_front();
+	    }
+    }
 }
+
