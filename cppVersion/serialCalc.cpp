@@ -14,29 +14,57 @@
 #include "esriHeader.h"
 
 
-serialCalc::serialCalc(std::deque<std::deque <double> > *input_buffer, boost::condition_variable_any *input_buffer_available, boost::mutex *input_buffer_lock, 
-               std::deque<std::deque <double> > *output_buffer, boost::condition_variable_any *output_buffer_available, boost::mutex *output_buffer_lock, esriHeader header_info){
+serialCalc::serialCalc(std::deque< std::deque <double> >* loadBuffer, std::vector< std::string >* functions, esriHeader* header,
+                       boost::condition_variable_any* load_buffer_available, boost::mutex* load_buffer_lock, 
+                       std::vector< std::deque< std::deque <double> >* >* outBuffers, std::vector< boost::condition_variable_any* >* buffer_available_list,
+                       std::vector< boost::mutex* >* buffer_lock_list){
+
+    this -> functions = functions;
 
     this -> input_buffer = input_buffer;
     this -> input_buffer_available = input_buffer_available;
     this -> input_buffer_lock = input_buffer_lock;
-    this -> output_buffer = output_buffer;
-    this -> output_buffer_available = output_buffer_available;
-    this -> output_buffer_lock = output_buffer_lock;
+
+    this -> outBuffers = outBuffers;
+    this -> buffer_available_list = buffer_available_list;
+    this -> buffer_lock_list = buffer_lock_list;
     this -> header_info;
+}
+
+/*
+    Starts everything object needs to do
+*/
+void serialCalc::run(){
+
+}
+
+double serialCalc::calculate(std::deque< std::deque <double> >* cur_lines, int i, std::string function){
+    switch(function[0]){
+        case 's':
+            return calc_slope(cur_lines, i);
+        break;
+        case 'h':
+
+        break;
+        case 'a':
+
+        break;
+        default:
+            std::cout << "Unsupported function type" << std::endl;
+        break;
+    }
 }
 
 /*
     saves 3 deques at a time to calculat slope of middle row
     passes that calculated row into output file
-
-
 */
 void serialCalc::run_func(){
     std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque <double> >;
     int count=0;
     int i;
     double cur_slope[header_info.ncols];
+    std::deque<double> temp;
 
     //First push back NODATA row for calculating sloep of first row
     cur_lines->push_back(std::deque<double> (header_info.ncols, header_info.NODATA));
@@ -58,24 +86,26 @@ void serialCalc::run_func(){
         ////////////////////UNLOCK/////////////////////////
         count++;
     }
+    for(int q = 0; q < functions -> size(); ++q){
+        //Calculate and write out first row
 
-    //Calculate and write out first row
-    std::deque<double> temp;
-    for(i=0; i<header_info.ncols; i++){
-        temp.push_back(calc_slope(cur_lines, i));
+        for(i=0; i<header_info.ncols; i++){
+            temp.push_back(calculate(cur_lines, i, functions -> at(q)));
+        }
+        boost::condition_variable_any* output_buffer_available = buffer_available_list -> at(q);
+        boost::mutex* output_buffer_lock = buffer_lock_list -> at(q);
+        std::deque< std::deque <double> >* output_buffer =  outBuffers -> at(q);
+        //////////////////////LOCK/////////////////////////
+        // send calculated line into output buffer  ///////
+            boost::mutex::scoped_lock lock(*output_buffer_lock);
+            while(output_buffer -> size() == 0){
+                output_buffer_available -> wait(*output_buffer_lock);
+            }
+            output_buffer -> push_back(temp);
+            output_buffer_available -> notify_one();
+            output_buffer_lock -> unlock();
     }
     temp.clear();
-    //////////////////////LOCK/////////////////////////
-    // send calculated line into output buffer  ///////
-    do{
-        boost::mutex::scoped_lock lock(*output_buffer_lock);
-        while(output_buffer -> size() == 0){
-            output_buffer_available -> wait(*output_buffer_lock);
-        }
-        output_buffer -> push_back(temp);
-        output_buffer_available -> notify_one();
-        output_buffer_lock -> unlock();
-    } while(false);
     ////////////////////UNLOCK/////////////////////////
 
     //Enter main while loop
@@ -95,6 +125,7 @@ void serialCalc::run_func(){
         } while(false);
         ////////////////////UNLOCK/////////////////////////
         count++;
+    /*
         for(i=0; i < header_info.ncols; i++){
             temp.push_back(calc_slope(cur_lines, i));
         }
@@ -109,6 +140,24 @@ void serialCalc::run_func(){
             output_buffer_available -> notify_one();
             output_buffer_lock -> unlock();
         } while(false);
+    */
+        for(int q = 0; q < functions -> size(); ++q){
+            for(i=0; i<header_info.ncols; i++){
+                temp.push_back(calculate(cur_lines, i, functions -> at(q)));
+            }
+            boost::condition_variable_any* output_buffer_available = buffer_available_list -> at(q);
+            boost::mutex* output_buffer_lock = buffer_lock_list -> at(q);
+            std::deque< std::deque <double> >* output_buffer =  outBuffers -> at(q);
+            //////////////////////LOCK/////////////////////////
+            // send calculated line into output buffer  ///////
+                boost::mutex::scoped_lock lock(*output_buffer_lock);
+                while(output_buffer -> size() == 0){
+                    output_buffer_available -> wait(*output_buffer_lock);
+                }
+                output_buffer -> push_back(temp);
+                output_buffer_available -> notify_one();
+                output_buffer_lock -> unlock();
+        }
         ////////////////////UNLOCK/////////////////////////
         temp.clear();
     }
@@ -117,20 +166,25 @@ void serialCalc::run_func(){
     cur_lines->pop_front();
     cur_lines->push_back(std::deque<double> (header_info.ncols, header_info.NODATA));
     //Calculate and write out last row
-    for(i=0; i < header_info.ncols; i++){
-        temp.push_back(calc_slope(cur_lines, i));
+    for(int q = 0; q < functions -> size(); ++q){
+        for(i=0; i < header_info.ncols; i++){
+            temp.push_back(calculate(cur_lines, i, functions -> at(q)));
+        }
+        boost::condition_variable_any* output_buffer_available = buffer_available_list -> at(q);
+        boost::mutex* output_buffer_lock = buffer_lock_list -> at(q);
+        std::deque< std::deque <double> >* output_buffer =  outBuffers -> at(q);
+        //////////////////////LOCK/////////////////////////
+        // send calculated line into output buffer  ///////
+        boost::mutex::scoped_lock lock(*output_buffer_lock);
+        while(output_buffer -> size() == 0){
+            output_buffer_available -> wait(*output_buffer_lock);
+        }
+        output_buffer -> push_back(temp);
+        output_buffer_available -> notify_one();
+        output_buffer_lock -> unlock();
+        ////////////////////UNLOCK/////////////////////////
+        temp.clear();
     }
-    //////////////////////LOCK/////////////////////////
-    // send calculated line into output buffer  ///////
-    boost::mutex::scoped_lock lock(*output_buffer_lock);
-    while(output_buffer -> size() == 0){
-        output_buffer_available -> wait(*output_buffer_lock);
-    }
-    output_buffer -> push_back(temp);
-    output_buffer_available -> notify_one();
-    output_buffer_lock -> unlock();
-    ////////////////////UNLOCK/////////////////////////
-    temp.clear();
     delete cur_lines;
 }
 

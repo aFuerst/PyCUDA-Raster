@@ -14,7 +14,7 @@
 #include "esriHeader.h"
 
 dataSaver::dataSaver(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available,
-		 boost::mutex *buffer_lock, esriHeader header)
+		 boost::mutex *buffer_lock, esriHeader* header)
 {
 	this -> fileName = fileName;
 	this -> buffer = buffer;
@@ -24,6 +24,12 @@ dataSaver::dataSaver(std::string fileName, std::deque<std::deque <double> > *buf
 	openFile();
 }
 
+/*
+    Starts everything object needs to do
+*/
+void dataSaver::run(){
+
+}
 
 void dataSaver::openFile()
 {
@@ -35,12 +41,12 @@ void dataSaver::openFile()
 		exit(1);	
 	}
 	//write header info to outputfile
-	outFile << "ncols "        << header.ncols     << '\n';
-	outFile << "nrows "        << header.nrows     << '\n';
-	outFile << "xllcorner "    << header.xllcorner << '\n';
-	outFile << "yllcorner "    << header.yllcorner << '\n';
-	outFile << "cellsize "     << header.cellsize  << '\n';
-	outFile << "NODATA_value " << header.NODATA    << '\n';
+	outFile << "ncols "        << header -> ncols     << '\n';
+	outFile << "nrows "        << header -> nrows     << '\n';
+	outFile << "xllcorner "    << header -> xllcorner << '\n';
+	outFile << "yllcorner "    << header -> yllcorner << '\n';
+	outFile << "cellsize "     << header -> cellsize  << '\n';
+	outFile << "NODATA_value " << header -> NODATA    << '\n';
 
 	write_func(&outFile);
 }
@@ -52,7 +58,7 @@ void dataSaver::write_func(std::ofstream* outFile)
 	int count = 0;
 	int i;
 	//enter main while loop
-	while(count < header.nrows)
+	while(count < header -> nrows)
 	{
 		//LOCK
 		boost::mutex::scoped_lock lock(*buffer_lock);
@@ -70,7 +76,7 @@ void dataSaver::write_func(std::ofstream* outFile)
 		buffer_lock -> unlock();
 		//UNLOCK
         for(i = 0; i < cur_lines -> size(); ++i){
-    		for(int q = 0; q < header.ncols; ++q)
+    		for(int q = 0; q < header -> ncols; ++q)
 	    	{
 	    		*outFile << cur_lines -> front().at(q); //need to figure out what command to call here to write to outfile
 	    	}

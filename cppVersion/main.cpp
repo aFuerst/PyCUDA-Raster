@@ -64,17 +64,24 @@ esriHeader getHeader(std::string fileName){
 void load_func(std::string inFile, std::deque< std::deque <double> >* loadBuffer, 
         boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
     dataLoader loader(inFile, loadBuffer, buffer_available, buffer_lock);
+    loader.run();
     return;
 }
 
-void calc_func(std::deque< std::deque <double> >* loadBuffer, std::vector< std::string > functions, esriHeader* header,
+void calc_func(std::deque< std::deque <double> >* loadBuffer, std::vector< std::string >* functions, esriHeader* header,
         boost::condition_variable_any* load_buffer_available, boost::mutex* load_buffer_lock, 
-        std::vector< std::deque< std::deque <double> >* >* outBuffers, std::vector< boost::condition_variable_any* >* buffer_available_list, std::vector< boost::mutex* >* buffer_lock_list){
+        std::vector< std::deque< std::deque <double> >* >* outBuffers, std::vector< boost::condition_variable_any* >* buffer_available_list,
+        std::vector< boost::mutex* >* buffer_lock_list){
+
+    serialCalc calc(loadBuffer, functions, header, load_buffer_available, load_buffer_lock, outBuffers, buffer_available_list, buffer_lock_list);
+    calc.run();
     return;
 }
 
 void save_func(std::string outFile ,std::deque< std::deque <double> >* saveBuffer, esriHeader* header, 
         boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
+    dataSaver save(outFile, saveBuffer, buffer_available, buffer_lock, header);
+    save.run();
     return;
 }
 
@@ -94,24 +101,27 @@ int main(int argc, char* argv[]){
         std::cout << functions.at(i) << std::endl;
     }
 
+    // locks for load buffer
     boost::condition_variable_any load_buffer_available;
     boost::mutex load_buffer_lock;
 
     std::deque< std::deque <double> >* loadBuffer = new std::deque< std::deque <double> >;
     boost::thread loadThread(load_func, argv[1], loadBuffer, &load_buffer_available, &load_buffer_lock);
 
+    // vectors to hold variable num of output buffers and locks
     std::vector< std::deque< std::deque <double> >* > outBuffers;
     std::vector< boost::condition_variable_any* > buffer_available_list;
     std::vector< boost::mutex* > buffer_lock_list;
 
     for (int i=0; i<outFiles.size(); i++){
+        // create all output buffers and locks
         outBuffers.push_back(new std::deque< std::deque <double> >);
         buffer_available_list.push_back(new boost::condition_variable_any);
         buffer_lock_list.push_back(new boost::mutex);
         boost::thread saveThread(save_func, outFiles[i], outBuffers.at(i), &header, buffer_available_list.at(i), buffer_lock_list.at(i));
     }
 
-    boost::thread calcThread(calc_func, loadBuffer, functions, &header, &load_buffer_available, &load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
+    boost::thread calcThread(calc_func, loadBuffer, &functions, &header, &load_buffer_available, &load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
 
     return 0;
 }

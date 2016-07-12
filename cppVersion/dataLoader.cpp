@@ -22,6 +22,13 @@ dataLoader::dataLoader(std::string fileName, std::deque<std::deque <double> > *b
     openFile();
 }
 
+/*
+    Starts everything object needs to do
+*/
+void dataLoader::run(){
+
+}
+
 std::string dataLoader::getHeader(){
     std::stringstream s;
     s << "ncols = " << ncols << "\n";

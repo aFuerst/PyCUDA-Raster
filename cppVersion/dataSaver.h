@@ -18,7 +18,8 @@ class dataSaver
 {
 public:
 	dataSaver(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available,
-		 boost::mutex *buffer_lock, esriHeader header);
+		 boost::mutex *buffer_lock, esriHeader* header);
+    void run();
 
 private:
 	void openFile();
@@ -29,7 +30,7 @@ private:
 	std::deque<std::deque <double> > *buffer;
 	boost::condition_variable_any *buffer_available;
 	boost::mutex *buffer_lock;
-    esriHeader header;
+    esriHeader* header;
 };
 
 #endif
