@@ -63,7 +63,7 @@ void load_func(std::string inFile, std::deque< std::deque <double> >* loadBuffer
         boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
     dataLoader loader(inFile, loadBuffer, buffer_available, buffer_lock);
     loader.run();
-    return;
+
 }
 
 void calc_func(std::deque< std::deque <double> >* loadBuffer, std::vector< std::string >* functions, esriHeader* header,
@@ -73,14 +73,14 @@ void calc_func(std::deque< std::deque <double> >* loadBuffer, std::vector< std::
 
     serialCalc calc(loadBuffer, functions, header, load_buffer_available, load_buffer_lock, outBuffers, buffer_available_list, buffer_lock_list);
     calc.run();
-    return;
+
 }
 
 void save_func(std::string outFile ,std::deque< std::deque <double> >* saveBuffer, esriHeader* header, 
         boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
     dataSaver save(outFile, saveBuffer, buffer_available, buffer_lock, header);
     save.run();
-    return;
+
 }
 
 int main(int argc, char* argv[]){
@@ -127,7 +127,14 @@ int main(int argc, char* argv[]){
 
     threads.join_all();
 */
+    //for(int i = 0; i , INT_MAX; ++i){}
+    
+    std::cout << "joining thread" << std::endl;
     loadThread.join();
+
+    delete load_buffer_available;
+    delete load_buffer_lock;
+    delete loadBuffer;
     std::cout << "END\n";
     return 0;
 }

@@ -21,6 +21,11 @@ dataLoader::dataLoader(std::string fileName, std::deque<std::deque <double> > *b
     this -> buffer_available = buffer_available;
     this -> buffer_lock = buffer_lock;
     openFile();
+    readHeader();
+}
+
+dataLoader::~dataLoader(){
+    inFile.close();
 }
 
 /*
@@ -28,7 +33,7 @@ dataLoader::dataLoader(std::string fileName, std::deque<std::deque <double> > *b
 */
 void dataLoader::run(){
     std::cout<< "Starting to read\n";
-    readLine();
+    readFile();
 }
 
 std::string dataLoader::getHeader(){
@@ -50,7 +55,7 @@ void dataLoader::openFile(){
     }
 }
 
-std::vector<double> dataLoader::readLine(){
+void dataLoader::readFile(){
     std::cout<<"Alive\n";
     std::string line;
     int i = 0;
@@ -58,7 +63,7 @@ std::vector<double> dataLoader::readLine(){
 
     //Read file line by line
     while(std::getline(inFile, line)) {
-        std::cout<<"Still alive\n";
+        //std::cout<<"Still alive " << i <<"\n";
         //removing whitespace in the begining of the lines
         line.erase(line.begin());
         std::istringstream ss(line);
@@ -69,23 +74,23 @@ std::vector<double> dataLoader::readLine(){
         }
         ///////////////LOCK////////////////////
         boost::mutex::scoped_lock lock(*buffer_lock);
-        std::cout<<"STAYIN ALIVE\n";
+        //std::cout<<"STAYIN ALIVE\n";
         while(buffer -> size() == MAX_BUF_SIZE){
             buffer_available -> wait(*buffer_lock);
         }
         buffer -> push_back(row);
+        buffer -> clear();
         buffer_available -> notify_one();
         buffer_lock -> unlock();
         /////////////UNLOCK///////////////////
         row.clear();
-   }
-/*
-    while(std::getline(inFile, x, ' ') && i < ncols) {
-        row.push_back(atof(x.c_str()));
         ++i;
+   }
+
+    if(inFile.eof()){
+        std::cout << "EOF reaced" << std::endl;
     }
-    return row;
-*/
+    return;
 }
 
 void dataLoader::readHeader(){

@@ -18,12 +18,13 @@ class dataLoader{
 
     public:
         dataLoader(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available, boost::mutex *buffer_lock);
+        ~dataLoader();
         std::string getHeader(void);
         void run();
 
     private:
         void readHeader();
-        std::vector<double> readLine();
+        void readFile();
         void openFile();
 
         long long ncols;
