@@ -23,7 +23,7 @@ public:
 
 private:
 	void openFile();
-	void write_func(std::ofstream* outFile);
+	void write_func();
 
 	std::string fileName;
 	std::ofstream outFile;	

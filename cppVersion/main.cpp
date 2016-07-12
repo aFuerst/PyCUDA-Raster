@@ -101,12 +101,15 @@ int main(int argc, char* argv[]){
         std::cout << functions.at(i) << std::endl;
     }
 
+    boost::thread_group threads;
+
     // locks for load buffer
     boost::condition_variable_any load_buffer_available;
     boost::mutex load_buffer_lock;
 
     std::deque< std::deque <double> >* loadBuffer = new std::deque< std::deque <double> >;
     boost::thread loadThread(load_func, argv[1], loadBuffer, &load_buffer_available, &load_buffer_lock);
+    threads.add_thread(&loadThread);
 
     // vectors to hold variable num of output buffers and locks
     std::vector< std::deque< std::deque <double> >* > outBuffers;
@@ -119,10 +122,15 @@ int main(int argc, char* argv[]){
         buffer_available_list.push_back(new boost::condition_variable_any);
         buffer_lock_list.push_back(new boost::mutex);
         boost::thread saveThread(save_func, outFiles[i], outBuffers.at(i), &header, buffer_available_list.at(i), buffer_lock_list.at(i));
+        threads.add_thread(&saveThread);
     }
 
     boost::thread calcThread(calc_func, loadBuffer, &functions, &header, &load_buffer_available, &load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
+    threads.add_thread(&calcThread);
 
+    threads.join_all();
+
+    std::cout << "END";
     return 0;
 }
 

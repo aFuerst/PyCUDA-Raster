@@ -26,7 +26,7 @@ dataLoader::dataLoader(std::string fileName, std::deque<std::deque <double> > *b
     Starts everything object needs to do
 */
 void dataLoader::run(){
-
+    readLine();
 }
 
 std::string dataLoader::getHeader(){

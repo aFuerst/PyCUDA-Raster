@@ -35,12 +35,13 @@ private:
     std::vector< boost::condition_variable_any* >* buffer_available_list;
     std::vector< boost::mutex* >* buffer_lock_list;
 
-    esriHeader header_info;
+    esriHeader* header_info;
 
     double calculate(std::deque< std::deque <double> >* cur_lines, int i, std::string function);
     double calc_slope(std::deque< std::deque <double> >* cur_lines, int col);
-    double calc_aspect();
-    double calc_hillshade();
+    double calc_aspect(std::deque< std::deque <double> >* cur_lines, int col);
+    double calc_hillshade(std::deque< std::deque <double> >* cur_lines, int col);   
+    double hillshade_aspect(double dz_dx, double dz_dy);
     void run_func();
 };
 

@@ -28,14 +28,14 @@ serialCalc::serialCalc(std::deque< std::deque <double> >* loadBuffer, std::vecto
     this -> outBuffers = outBuffers;
     this -> buffer_available_list = buffer_available_list;
     this -> buffer_lock_list = buffer_lock_list;
-    this -> header_info;
+    this -> header_info = header;
 }
 
 /*
     Starts everything object needs to do
 */
 void serialCalc::run(){
-
+    run_func();
 }
 
 double serialCalc::calculate(std::deque< std::deque <double> >* cur_lines, int i, std::string function){
@@ -44,10 +44,10 @@ double serialCalc::calculate(std::deque< std::deque <double> >* cur_lines, int i
             return calc_slope(cur_lines, i);
         break;
         case 'h':
-
+            return calc_hillshade(cur_lines, i);
         break;
         case 'a':
-
+            return calc_aspect(cur_lines, i);
         break;
         default:
             std::cout << "Unsupported function type" << std::endl;
@@ -63,11 +63,11 @@ void serialCalc::run_func(){
     std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque <double> >;
     int count=0;
     int i;
-    double cur_slope[header_info.ncols];
+    double cur_slope[header_info -> ncols];
     std::deque<double> temp;
 
     //First push back NODATA row for calculating sloep of first row
-    cur_lines->push_back(std::deque<double> (header_info.ncols, header_info.NODATA));
+    cur_lines->push_back(std::deque<double> (header_info -> ncols, header_info -> NODATA));
 
     //Next, grab first two rows of data
     for(i=0; i<2; i++){
@@ -89,7 +89,7 @@ void serialCalc::run_func(){
     for(int q = 0; q < functions -> size(); ++q){
         //Calculate and write out first row
 
-        for(i=0; i<header_info.ncols; i++){
+        for(i=0; i<header_info -> ncols; i++){
             temp.push_back(calculate(cur_lines, i, functions -> at(q)));
         }
         boost::condition_variable_any* output_buffer_available = buffer_available_list -> at(q);
@@ -109,7 +109,7 @@ void serialCalc::run_func(){
     ////////////////////UNLOCK/////////////////////////
 
     //Enter main while loop
-    while (count < header_info.nrows){
+    while (count < header_info -> nrows){
         cur_lines->pop_front();
         //////////////////////LOCK/////////////////////////
         // get new line
@@ -125,24 +125,9 @@ void serialCalc::run_func(){
         } while(false);
         ////////////////////UNLOCK/////////////////////////
         count++;
-    /*
-        for(i=0; i < header_info.ncols; i++){
-            temp.push_back(calc_slope(cur_lines, i));
-        }
-        //////////////////////LOCK/////////////////////////
-        // send calculated line into output buffer  ///////
-        do{
-            boost::mutex::scoped_lock lock(*output_buffer_lock);
-            while(output_buffer -> size() == 0){
-                output_buffer_available -> wait(*output_buffer_lock);
-            }
-            output_buffer -> push_back(temp);
-            output_buffer_available -> notify_one();
-            output_buffer_lock -> unlock();
-        } while(false);
-    */
+
         for(int q = 0; q < functions -> size(); ++q){
-            for(i=0; i<header_info.ncols; i++){
+            for(i=0; i<header_info -> ncols; i++){
                 temp.push_back(calculate(cur_lines, i, functions -> at(q)));
             }
             boost::condition_variable_any* output_buffer_available = buffer_available_list -> at(q);
@@ -164,10 +149,10 @@ void serialCalc::run_func(){
 
     //Push back another NODATA row to calculate the last row with.
     cur_lines->pop_front();
-    cur_lines->push_back(std::deque<double> (header_info.ncols, header_info.NODATA));
+    cur_lines->push_back(std::deque<double> (header_info -> ncols, header_info -> NODATA));
     //Calculate and write out last row
     for(int q = 0; q < functions -> size(); ++q){
-        for(i=0; i < header_info.ncols; i++){
+        for(i=0; i < header_info -> ncols; i++){
             temp.push_back(calculate(cur_lines, i, functions -> at(q)));
         }
         boost::condition_variable_any* output_buffer_available = buffer_available_list -> at(q);
@@ -194,8 +179,8 @@ void serialCalc::run_func(){
  *              of the cell we're calculating the slope for.
  */
 double serialCalc::calc_slope(std::deque< std::deque <double> >* cur_lines, int col) {
-        if (cur_lines->at(1)[col] == header_info.NODATA){
-            return header_info.NODATA;
+        if (cur_lines->at(1)[col] == header_info -> NODATA){
+            return header_info -> NODATA;
         }
 
         double nbhd[9];//'neighborhood' of current cell
@@ -203,8 +188,8 @@ double serialCalc::calc_slope(std::deque< std::deque <double> >* cur_lines, int 
         
         for (int i=0; i<3; i++){
             for (int j=-1; j<2; j++){
-                if ((col+j < 0) or (col+j > header_info.ncols)){
-                    nbhd[k] = header_info.NODATA;
+                if ((col+j < 0) or (col+j > header_info -> ncols)){
+                    nbhd[k] = header_info -> NODATA;
                 }
                 else{
                     nbhd[k] = cur_lines->at(i)[col+j];
@@ -213,8 +198,108 @@ double serialCalc::calc_slope(std::deque< std::deque <double> >* cur_lines, int 
             }
         }
 
-        double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*header_info.cellsize);
-        double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*header_info.cellsize);
+        double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*header_info -> cellsize);
+        double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*header_info -> cellsize);
 
         return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
+}
+
+double serialCalc::calc_aspect(std::deque< std::deque <double> >* cur_lines, int col){
+    if (cur_lines->at(1)[col] == header_info -> NODATA){
+        return header_info -> NODATA;
+    }
+
+    double nbhd[9];//'neighborhood' of current cell
+    int k=0;
+        
+    for (int i=0; i<3; i++){
+        for (int j=-1; j<2; j++){
+            if ((col+j < 0) or (col+j > header_info -> ncols)){
+                nbhd[k] = header_info -> NODATA;
+            }
+             else{
+                nbhd[k] = cur_lines->at(i)[col+j];
+            }
+            k++;
+        }
+    }
+
+    double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*header_info -> cellsize);
+    double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*header_info -> cellsize);
+    double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
+        if(dz_dx == header_info -> NODATA || dz_dy == header_info -> NODATA || (dz_dx == 0.0 && dz_dy == 0.0)){
+            return header_info -> NODATA;
+        } else{
+            if(aspect > 90.0){
+                aspect = 360.0 - aspect + 90.0;
+            } else {
+                aspect = 90.0 - aspect;
+            }
+            aspect = aspect * (M_PI / 180.0);
+            return aspect;
+        }
+}
+
+double serialCalc::calc_hillshade(std::deque< std::deque <double> >* cur_lines, int col){
+    if (cur_lines->at(1)[col] == header_info -> NODATA){
+        return header_info -> NODATA;
+    }
+    double nbhd[9];//'neighborhood' of current cell
+    int k=0;
+    for (int i=0; i<3; i++){
+        for (int j=-1; j<2; j++){
+            if ((col+j < 0) or (col+j > header_info -> ncols)){
+                nbhd[k] = header_info -> NODATA;
+            }
+            else{
+                nbhd[k] = cur_lines->at(i)[col+j];
+            }
+            k++;
+        }
+    }
+    double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8*header_info -> cellsize);
+    double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8*header_info -> cellsize);
+
+    double slp = calc_slope(cur_lines, col);
+    double asp = hillshade_aspect(dz_dx, dz_dy);
+
+                        /* calc zenith */
+    double altitude = 45;
+	double zenith_deg = 90 - altitude;
+	double zenith_rad = zenith_deg * (M_PI / 180.0);
+	
+                        /* calc azimuth */
+	double azimuth = 315;
+	double azimuth_math = (360 - azimuth + 90);
+	if(azimuth_math >= 360.0){
+	    azimuth_math = azimuth_math - 360;
+    }	
+    double azimuth_rad = (azimuth_math * M_PI / 180.0);
+
+    double hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
+
+	if(hs < 0){
+	    return 0;
+    } else {
+        return hs;
+    }
+}
+
+double serialCalc::hillshade_aspect(double dz_dx, double dz_dy){
+    double aspect;
+    if(dz_dx != 0){
+        aspect = atan2(dz_dy, -(dz_dx));
+        if(aspect < 0){
+            aspect = ((2 * M_PI) + aspect);
+        }
+    } else if(dz_dx == 0){
+        if(dz_dy > 0){
+            aspect = (M_PI / 2);
+        }else if(dz_dy < 0){
+            aspect = ((2 * M_PI) - (M_PI / 2));
+        }else{
+            aspect = atan2(dz_dy, -(dz_dx));
+        }
+    }
+    return aspect;
 }

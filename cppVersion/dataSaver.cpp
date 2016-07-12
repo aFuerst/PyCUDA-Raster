@@ -21,14 +21,15 @@ dataSaver::dataSaver(std::string fileName, std::deque<std::deque <double> > *buf
 	this -> buffer_available = buffer_available;
 	this -> buffer_lock = buffer_lock;
     this -> header = header;
-	openFile();
+	//openFile();
 }
 
 /*
     Starts everything object needs to do
 */
 void dataSaver::run(){
-
+    openFile();
+    write_func();
 }
 
 void dataSaver::openFile()
@@ -48,11 +49,11 @@ void dataSaver::openFile()
 	outFile << "cellsize "     << header -> cellsize  << '\n';
 	outFile << "NODATA_value " << header -> NODATA    << '\n';
 
-	write_func(&outFile);
+	//write_func(&outFile);
 }
 
 //write data to the output file
-void dataSaver::write_func(std::ofstream* outFile)
+void dataSaver::write_func()
 {
 	std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque < double> >;
 	int count = 0;
@@ -78,9 +79,9 @@ void dataSaver::write_func(std::ofstream* outFile)
         for(i = 0; i < cur_lines -> size(); ++i){
     		for(int q = 0; q < header -> ncols; ++q)
 	    	{
-	    		*outFile << cur_lines -> front().at(q); //need to figure out what command to call here to write to outfile
+	    		outFile << cur_lines -> front().at(q); //need to figure out what command to call here to write to outfile
 	    	}
-	    	*outFile << '\n';
+	    	outFile << '\n';
             cur_lines -> pop_front();
 	    }
     }
