@@ -27,7 +27,6 @@ esriHeader getHeader(std::string fileName){
 
     esriHeader toReturn;
 
-    std::cout << "Entering loop" << "\n";
     while (count < 6){
         std::getline(inFile, *header);
         if(count == 0){
@@ -57,7 +56,6 @@ esriHeader getHeader(std::string fileName){
         temp = 0;
         ++count;
     }
-    std::cout << toReturn.ncols << "\n" << toReturn.nrows << "\n" << toReturn.cellsize;
     return toReturn;
 }
 
@@ -93,23 +91,22 @@ int main(int argc, char* argv[]){
         functions.push_back(argv[i+1]);
     }
 
-    std::cout << argv[1] << "\n";
     esriHeader header = getHeader(argv[1]);
 
-    for (int i=0; i<outFiles.size(); i++){
+    /*for (int i=0; i<outFiles.size(); i++){
         std::cout << outFiles.at(i) << std::endl;
         std::cout << functions.at(i) << std::endl;
-    }
+    }*/
 
     boost::thread_group threads;
 
     // locks for load buffer
-    boost::condition_variable_any load_buffer_available;
-    boost::mutex load_buffer_lock;
+    boost::condition_variable_any* load_buffer_available = new boost::condition_variable_any;
+    boost::mutex* load_buffer_lock = new boost::mutex;
 
     std::deque< std::deque <double> >* loadBuffer = new std::deque< std::deque <double> >;
-    boost::thread loadThread(load_func, argv[1], loadBuffer, &load_buffer_available, &load_buffer_lock);
-    threads.add_thread(&loadThread);
+    boost::thread loadThread(load_func, argv[1], loadBuffer, load_buffer_available, load_buffer_lock);
+/*    threads.add_thread(&loadThread);
 
     // vectors to hold variable num of output buffers and locks
     std::vector< std::deque< std::deque <double> >* > outBuffers;
@@ -129,8 +126,9 @@ int main(int argc, char* argv[]){
     threads.add_thread(&calcThread);
 
     threads.join_all();
-
-    std::cout << "END";
+*/
+    loadThread.join();
+    std::cout << "END\n";
     return 0;
 }
 

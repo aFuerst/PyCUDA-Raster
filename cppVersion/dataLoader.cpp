@@ -15,6 +15,7 @@
 const static int MAX_BUF_SIZE = 70000;
 
 dataLoader::dataLoader(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available, boost::mutex *buffer_lock){
+    std::cout << "initializing loader\n";
     this -> fileName = fileName;
     this -> buffer = buffer;
     this -> buffer_available = buffer_available;
@@ -26,6 +27,7 @@ dataLoader::dataLoader(std::string fileName, std::deque<std::deque <double> > *b
     Starts everything object needs to do
 */
 void dataLoader::run(){
+    std::cout<< "Starting to read\n";
     readLine();
 }
 
@@ -49,30 +51,33 @@ void dataLoader::openFile(){
 }
 
 std::vector<double> dataLoader::readLine(){
+    std::cout<<"Alive\n";
     std::string line;
     int i = 0;
     std::deque< double > row;
 
     //Read file line by line
     while(std::getline(inFile, line)) {
-	//removing whitespace in the begining of the lines
+        std::cout<<"Still alive\n";
+        //removing whitespace in the begining of the lines
         line.erase(line.begin());
-		std::istringstream ss(line);
+        std::istringstream ss(line);
         std::string x;
         //Copy each token from a line into deque
         while(std::getline(ss, x, ' ')) {
             row.push_back(atof(x.c_str()));
-       }
-       ///////////////LOCK////////////////////
-       boost::mutex::scoped_lock lock(*buffer_lock);
-       while(buffer -> size() == MAX_BUF_SIZE){
-           buffer_available -> wait(*buffer_lock);
-       }
-       buffer -> push_back(row);
-       buffer_available -> notify_one();
-       buffer_lock -> unlock();
-       /////////////UNLOCK///////////////////
-       row.clear();
+        }
+        ///////////////LOCK////////////////////
+        boost::mutex::scoped_lock lock(*buffer_lock);
+        std::cout<<"STAYIN ALIVE\n";
+        while(buffer -> size() == MAX_BUF_SIZE){
+            buffer_available -> wait(*buffer_lock);
+        }
+        buffer -> push_back(row);
+        buffer_available -> notify_one();
+        buffer_lock -> unlock();
+        /////////////UNLOCK///////////////////
+        row.clear();
    }
 /*
     while(std::getline(inFile, x, ' ') && i < ncols) {
