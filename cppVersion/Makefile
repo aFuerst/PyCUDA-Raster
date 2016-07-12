@@ -9,7 +9,7 @@
 CC = g++
 
 # define any compile-time flags
-# CFLAGS = -Wall -g
+CFLAGS = -g
 
 # define any directories containing header files other than /usr/include
 #
@@ -33,10 +33,10 @@ SRCS = dataLoader.cpp dataSaver.cpp serialCalc.cpp main.cpp
 # This uses Suffix Replacement within a macro:
 #   $(name:string1=string2)
 #         For each word in 'name' replace 'string1' with 'string2'
-# Below we are replacing the suffix .c of all words in the macro SRCS
+# Below we are replacing the suffix .cpp of all words in the macro SRCS
 # with the .o suffix
 #
-OBJS = $(SRCS:.c=.o)
+OBJS = $(SRCS:.cpp=.o)
 
 # define the executable file 
 MAIN = scheduler
