@@ -99,12 +99,7 @@ class dataSaver(Process):
             #print nrows
             # get line from pipe
             try:
-                #arr=self.input_pipe.recv()
-                if self.input_pipe.poll(50):
-                    arr=self.input_pipe.recv()
-                else:
-                    # end of file reached
-                    raise EOFError
+                arr=self.input_pipe.recv()
             except EOFError:
                 print "Pipe empty"
                 return

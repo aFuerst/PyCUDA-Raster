@@ -5,6 +5,8 @@ from gpustruct import GPUStruct
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 
+TOTALROWCOUNT = 0
+
 """
 GPUCalculator
 
@@ -22,6 +24,7 @@ class GPUCalculator(Process):
         header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
         _inputPipe - a Pipe object to read information from
         _outputPipe - a Pipe object to send information to
+        functionTypes - list of strings that are supported function names as strings
 
     creates empty instance variables needed later
     """
@@ -89,13 +92,16 @@ class GPUCalculator(Process):
                 self.write_data(count, self.outputPipes[i])
 
             count += (self.maxPossRows-2)  # -2 because of buffer rows
-            print "Page done..."
+            print "Page done... %2.3f %% completed" % ((float(count) / float(self.totalRows)) * 100)
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):
             self.process_data(self.functions[i])
-            cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
+            cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu) 
             self.write_data(count, self.outputPipes[i])
+
+        for pipe in self.outputPipes:
+            pipe.close()
 
         print "GPU calculations finished"
 
@@ -113,6 +119,7 @@ class GPUCalculator(Process):
         if self.totalRows < self.maxPossRows:
             print "reducing max rows to reduce memory use on GPU"
             self.maxPossRows = self.totalRows
+            #self.maxPossRows = 100
 
         # create pagelocked buffers and GPU arrays
         self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
@@ -134,7 +141,7 @@ class GPUCalculator(Process):
             #If this is the first page, insert a buffer row
             for col in range(self.totalCols):
                 self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
-            row_count = 1           
+            row_count = 1
         else:
             #otherwise, insert carry over rows from last page
             for col in range(self.totalCols):
@@ -144,13 +151,15 @@ class GPUCalculator(Process):
 
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
+            #print row_count, count
             try:
                 # check if something is in the pipe for 5 seconds
-                if self.inputPipe.poll(5):
-                    cur_row = self.inputPipe.recv()
-                else:
-                    # end of file reached
+                if count + row_count > self.totalRows:
+                    # end of file reached       
+                    cur_row = None             
                     raise EOFError
+                else:
+                    cur_row = self.inputPipe.recv()
 
                 for col in range(self.totalCols):
                     self.to_gpu_buffer[row_count][col] = cur_row[col]
@@ -163,7 +172,7 @@ class GPUCalculator(Process):
                 return False
 
             row_count += 1
-
+            
         #Update carry over rows
         np.put(self.carry_over_rows[0], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-2])
         np.put(self.carry_over_rows[1], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-1])
@@ -219,6 +228,7 @@ class GPUCalculator(Process):
     Writes results to output pipe. This pipe goes to dataSaver.py
     """
     def write_data(self, count, outPipe):
+        """
         #skip first and last rows, since they were buffers in the computation
         max = self.maxPossRows
         # see if written out more than total number of rows plus a small buffer
@@ -227,7 +237,11 @@ class GPUCalculator(Process):
             max = self.totalRows - count
         for row in range(1, max):
             outPipe.send(self.from_gpu_buffer[row])
-
+        """
+        for row in range(1, self.maxPossRows-1):
+            if count + row > self.totalRows:
+                break
+            outPipe.send(self.from_gpu_buffer[row])
     """
     stop 
 
