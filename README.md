@@ -19,6 +19,10 @@ Dependencies:
     PyCUDA
         https://mathema.tician.de/software/pycuda/
 
+    The gpustruct class was taken from another git repo:
+        https://github.com/compmem/cutools
+    Thanks to OSU!
+
 Installation:
 
     Simply download this git repository to your local machine and put them
