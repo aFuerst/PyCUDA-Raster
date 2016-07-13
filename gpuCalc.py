@@ -92,7 +92,7 @@ class GPUCalculator(Process):
                 self.write_data(count, self.outputPipes[i])
 
             count += (self.maxPossRows-2)  # -2 because of buffer rows
-            print "Page done... %2.3f %% completed" % ((float(count) / float(self.totalRows)) * 100)
+            print "Page done... %.3f %% completed" % ((float(count) / float(self.totalRows)) * 100)
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):

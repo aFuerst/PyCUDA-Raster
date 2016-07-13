@@ -30,7 +30,7 @@ class dataSaver(Process):
     """
     def __init__(self, outputFile,  header, input_pipe):
         Process.__init__(self)
-        self.outFile = None
+        #self.outFile = None
         self.fileName = outputFile 
         self.input_pipe=input_pipe
 
@@ -56,21 +56,23 @@ class dataSaver(Process):
         self._closeFile()
 
     """
+    _closeFile
+
+    
     """
     def _closeFile(self):
         if ".tif" in self.fileName:
             self.dataset.FlushCache()
         elif ".asc" in self.fileName:
             self.outFile.close()
-        pass
-        
+
     """
     stop
     
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping saver..."
+        print "Stopping saver ", self.fileName ," ..."
         exit(1)
 
     """
@@ -87,7 +89,7 @@ class dataSaver(Process):
             try:
                 self.outFile = open(self.fileName, 'w')
             except IOError:
-                print "cannot open", self.fileName
+                print "Cannot open", self.fileName
                 self.stop()
             except ValueError:
                 print "Output file name was not a string"
@@ -97,8 +99,8 @@ class dataSaver(Process):
             self.outFile.write(
                     "ncols %.0f\n"
                     "nrows %.0f\n"
-                    "xllcorner %.0f\n"
-                    "yllcorner %.0f\n"
+                    "xllcorner %.2f\n"
+                    "yllcorner %.2f\n"
                     "cellsize %f\n"
                     "NODATA_value %f\n"
                     % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
@@ -118,30 +120,20 @@ class dataSaver(Process):
     """
     def write_func(self):
         nrows = 0
-        if ".asc" in self.fileName: 
-            while nrows < self.totalRows:
-            #print nrows
+        while nrows < self.totalRows:
             # get line from pipe
-                try:
-                    arr=self.input_pipe.recv()
-                except EOFError:
-                    print "Pipe empty"
-                    return
+            try:
+                arr=self.input_pipe.recv()
+            except EOFError:
+                print "Pipe empty"
+                return
+            if ".asc" in self.fileName: 
                 arr.tofile(self.outFile, sep=" ", format="%.3f")
                 self.outFile.write('\n')
-                nrows+=1
-        elif ".tif" in self.fileName:
-            while nrows < self.totalRows-1:
-            # get line from pipe
-                try:
-                    arr=self.input_pipe.recv()
-                except EOFError:
-                    print "Pipe empty"
-                    return
-                arr = np.float64([arr])
-                self.dataset.GetRasterBand(1).WriteArray(arr, 0, nrows)
+            elif ".tif" in self.fileName:
+                self.dataset.GetRasterBand(1).WriteArray(np.float64([arr]), 0, nrows-1)
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
-                nrows+=1
+            nrows+=1
         print "Output %s written to disk" % self.fileName
 
