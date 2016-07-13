@@ -30,7 +30,7 @@ class dataSaver(Process):
     """
     def __init__(self, outputFile,  header, input_pipe):
         Process.__init__(self)
-        #self.outFile = None
+        self.outFile = None
         self.fileName = outputFile 
         self.input_pipe=input_pipe
 
@@ -95,23 +95,17 @@ class dataSaver(Process):
 
             # write out header
             self.outFile.write(
-                    "ncols %f\n"
-                    "nrows %f\n"
-                    "xllcorner %f\n"
-                    "yllcorner %f\n"
+                    "ncols %.0f\n"
+                    "nrows %.0f\n"
+                    "xllcorner %.0f\n"
+                    "yllcorner %.0f\n"
                     "cellsize %f\n"
                     "NODATA_value %f\n"
                     % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
                     )
         elif ".tif" in self.fileName:
-            #y_pixels = self.totalRows  # number of pixels in x
-            #x_pixels = self.totalCols  # number of pixels in y
-            #print x_pixels, y_pixels
-            #PIXEL_SIZE = self.cellsize  # size of the pixel...        
-            #x_min = self.xllcorner  
-            #y_max = self.yllcorner  # x_min & y_max are like the "top left" corner.
             self.driver = gdal.GetDriverByName('GTiff')
-            self.dataset = self.driver.Create(self.fileName, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
+            self.dataset = self.driver.Create(self.fileName, self.totalCols, self.totalRows, 1, gdal.GDT_Float64)
             self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
             self.dataset.SetGeoTransform(self.GeoT)
             self.dataset.SetProjection(self.prj)
@@ -124,22 +118,30 @@ class dataSaver(Process):
     """
     def write_func(self):
         nrows = 0
-        while nrows < self.totalRows - 1:
+        if ".asc" in self.fileName: 
+            while nrows < self.totalRows:
             #print nrows
             # get line from pipe
-            try:
-                arr=self.input_pipe.recv()
-            except EOFError:
-                print "Pipe empty"
-                return
-            if ".asc" in self.fileName:            
-                arr.tofile(self.outFile, sep=" ", format="%f")
+                try:
+                    arr=self.input_pipe.recv()
+                except EOFError:
+                    print "Pipe empty"
+                    return
+                arr.tofile(self.outFile, sep=" ", format="%.3f")
                 self.outFile.write('\n')
-            elif ".tif" in self.fileName:
-                arr = np.float32([arr])
+                nrows+=1
+        elif ".tif" in self.fileName:
+            while nrows < self.totalRows-1:
+            # get line from pipe
+                try:
+                    arr=self.input_pipe.recv()
+                except EOFError:
+                    print "Pipe empty"
+                    return
+                arr = np.float64([arr])
                 self.dataset.GetRasterBand(1).WriteArray(arr, 0, nrows)
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
-            nrows+=1
+                nrows+=1
         print "Output %s written to disk" % self.fileName
 
