@@ -6,6 +6,8 @@ from time import sleep
 
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
+# input and output files must have the same file type
+
 def run(inputFile, outputFiles, functions):
     
     # create input and output pipes    

@@ -40,10 +40,13 @@ class dataLoader(Process):
     
     Returns header information as a six-tuple in this order:
     (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
+    (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner, GeoT, prj)
     """
     def getHeaderInfo(self):
-        return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner
-
+        if ".asc" in self.file_name:
+            return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner
+        elif ".tif" in self.file_name:
+            return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj
     """
     _readHeaderInfo
 
@@ -58,10 +61,11 @@ class dataLoader(Process):
             self.cellsize = np.float64(self.open_file.readline().split()[1])
             self.NODATA = np.float64(self.open_file.readline().split()[1])
         elif ".tif" in self.file_name:
-            GeoT = self.open_file.GetGeoTransform()
+            self.GeoT = self.open_file.GetGeoTransform()
+            self.prj = self.open_file.GetProjection()
             self.NODATA = self.open_raster_band.GetNoDataValue()
-            self.xllcorner = GeoT[0]
-            self.yllcorner = GeoT[3]
+            self.xllcorner = self.GeoT[0]
+            self.yllcorner = self.GeoT[3]
             self.cellsize = self.open_raster_band.GetScale()
             self.totalRows = self.open_raster_band.YSize
             self.totalCols = self.open_raster_band.XSize
