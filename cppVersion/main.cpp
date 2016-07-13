@@ -98,7 +98,7 @@ int main(int argc, char* argv[]){
         std::cout << functions.at(i) << std::endl;
     }*/
 
-    boost::thread_group threads;
+    //boost::thread_group threads;
 
     // locks for load buffer
     boost::condition_variable_any* load_buffer_available = new boost::condition_variable_any;
@@ -106,31 +106,35 @@ int main(int argc, char* argv[]){
 
     std::deque< std::deque <double> >* loadBuffer = new std::deque< std::deque <double> >;
     boost::thread loadThread(load_func, argv[1], loadBuffer, load_buffer_available, load_buffer_lock);
-/*    threads.add_thread(&loadThread);
+
 
     // vectors to hold variable num of output buffers and locks
     std::vector< std::deque< std::deque <double> >* > outBuffers;
     std::vector< boost::condition_variable_any* > buffer_available_list;
     std::vector< boost::mutex* > buffer_lock_list;
+    std::vector< boost::thread* > thread_list;
 
-    for (int i=0; i<outFiles.size(); i++){
+    for (unsigned i=0; i<outFiles.size(); ++i){
         // create all output buffers and locks
         outBuffers.push_back(new std::deque< std::deque <double> >);
         buffer_available_list.push_back(new boost::condition_variable_any);
         buffer_lock_list.push_back(new boost::mutex);
         boost::thread saveThread(save_func, outFiles[i], outBuffers.at(i), &header, buffer_available_list.at(i), buffer_lock_list.at(i));
-        threads.add_thread(&saveThread);
+        thread_list.push_back(&saveThread);
     }
 
-    boost::thread calcThread(calc_func, loadBuffer, &functions, &header, &load_buffer_available, &load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
-    threads.add_thread(&calcThread);
-
-    threads.join_all();
-*/
-    //for(int i = 0; i , INT_MAX; ++i){}
+    boost::thread calcThread(calc_func, loadBuffer, &functions, &header, load_buffer_available, load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
     
-    std::cout << "joining thread" << std::endl;
+    std::cout << "joining threads" << std::endl;
+
     loadThread.join();
+    std::cout << "load thread joined" << std::endl;
+    //saveThread.join();
+    calcThread.join();
+    std::cout << "calc thread joined" << std::endl;
+    for (unsigned i=0; i<thread_list.size(); ++i){
+        thread_list.at(i) -> join();
+    }
 
     delete load_buffer_available;
     delete load_buffer_lock;

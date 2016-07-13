@@ -51,6 +51,7 @@ double serialCalc::calculate(std::deque< std::deque <double> >* cur_lines, int i
         break;
         default:
             std::cout << "Unsupported function type" << std::endl;
+            return 0;
         break;
     }
 }
@@ -60,10 +61,11 @@ double serialCalc::calculate(std::deque< std::deque <double> >* cur_lines, int i
     passes that calculated row into output file
 */
 void serialCalc::run_func(){
+    std::cout << "in run_func" << std::endl;
     std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque <double> >;
     int count=0;
     int i;
-    double cur_slope[header_info -> ncols];
+    //double cur_slope[header_info -> ncols];
     std::deque<double> temp;
 
     //First push back NODATA row for calculating sloep of first row
@@ -71,22 +73,25 @@ void serialCalc::run_func(){
 
     //Next, grab first two rows of data
     for(i=0; i<2; i++){
+        std::cout << "for loop" << input_buffer_lock << std::endl;
         //////////////////////LOCK/////////////////////////
-        do{
+            //input_buffer_lock -> lock();
             boost::mutex::scoped_lock lock(*input_buffer_lock);
+            std::cout << "lock acquired " << std::endl;
             while(input_buffer -> size() == 0){
                 input_buffer_available -> wait(*input_buffer_lock);
-            }
+            }   
+            std::cout << "taking the shot" << std::endl;
             //DONT pop anything from cur_lines yet, need to fill with three rows.
             cur_lines->push_back(input_buffer -> front());
             input_buffer -> pop_front();
             input_buffer_available -> notify_one();
             input_buffer_lock -> unlock();
-        } while(false);
         ////////////////////UNLOCK/////////////////////////
         count++;
     }
-    for(int q = 0; q < functions -> size(); ++q){
+    std::cout << "grabbed first two data lines" << std::endl;
+    for(unsigned q = 0; q < functions -> size(); ++q){
         //Calculate and write out first row
 
         for(i=0; i<header_info -> ncols; i++){
@@ -110,6 +115,7 @@ void serialCalc::run_func(){
 
     //Enter main while loop
     while (count < header_info -> nrows){
+        std::cout << "inside loop" << std::endl;
         cur_lines->pop_front();
         //////////////////////LOCK/////////////////////////
         // get new line
@@ -126,7 +132,7 @@ void serialCalc::run_func(){
         ////////////////////UNLOCK/////////////////////////
         count++;
 
-        for(int q = 0; q < functions -> size(); ++q){
+        for(unsigned q = 0; q < functions -> size(); ++q){
             for(i=0; i<header_info -> ncols; i++){
                 temp.push_back(calculate(cur_lines, i, functions -> at(q)));
             }
@@ -146,12 +152,12 @@ void serialCalc::run_func(){
         ////////////////////UNLOCK/////////////////////////
         temp.clear();
     }
-
+    std::cout << "loop done" << std::endl;
     //Push back another NODATA row to calculate the last row with.
     cur_lines->pop_front();
     cur_lines->push_back(std::deque<double> (header_info -> ncols, header_info -> NODATA));
     //Calculate and write out last row
-    for(int q = 0; q < functions -> size(); ++q){
+    for(unsigned q = 0; q < functions -> size(); ++q){
         for(i=0; i < header_info -> ncols; i++){
             temp.push_back(calculate(cur_lines, i, functions -> at(q)));
         }

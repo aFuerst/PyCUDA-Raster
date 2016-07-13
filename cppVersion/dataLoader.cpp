@@ -79,8 +79,9 @@ void dataLoader::readFile(){
             buffer_available -> wait(*buffer_lock);
         }
         buffer -> push_back(row);
-        buffer -> clear();
+        //std::cout << "in loader: " << i << std::endl;
         buffer_available -> notify_one();
+        std::cout << "sending notification" << std::endl;
         buffer_lock -> unlock();
         /////////////UNLOCK///////////////////
         row.clear();

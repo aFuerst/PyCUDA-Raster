@@ -48,8 +48,6 @@ void dataSaver::openFile()
 	outFile << "yllcorner "    << header -> yllcorner << '\n';
 	outFile << "cellsize "     << header -> cellsize  << '\n';
 	outFile << "NODATA_value " << header -> NODATA    << '\n';
-
-	//write_func(&outFile);
 }
 
 //write data to the output file
@@ -57,29 +55,30 @@ void dataSaver::write_func()
 {
 	std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque < double> >;
 	int count = 0;
-	int i;
+	unsigned i;
+    int final_countdown = 0;
 	//enter main while loop
 	while(count < header -> nrows)
 	{
 		//LOCK
 		boost::mutex::scoped_lock lock(*buffer_lock);
-		while(buffer -> size() == 0)
-		{
-			buffer_available -> wait(*buffer_lock);
+		while(buffer -> size() == 0){
+			buffer_available -> wait(*buffer_lock);            
 		}
+        //std::cout << "in saver: " << final_countdown++ << std::endl;
         // grab as many rows as are in buffer
-        for(i = 0; i < buffer -> size(); ++i){
-            cur_lines -> push_back(buffer -> front());
-            buffer -> pop_front();
-            ++count;
-        }
+        //for(i = 0; i < buffer -> size(); ++i){
+        cur_lines -> push_back(buffer -> front());
+        buffer -> pop_front();
+        ++count;
+        //}
 		buffer_available -> notify_one();
 		buffer_lock -> unlock();
 		//UNLOCK
         for(i = 0; i < cur_lines -> size(); ++i){
     		for(int q = 0; q < header -> ncols; ++q)
 	    	{
-	    		outFile << cur_lines -> front().at(q); //need to figure out what command to call here to write to outfile
+	    		outFile << cur_lines -> front().at(q) << ' '; //need to figure out what command to call here to write to outfile
 	    	}
 	    	outFile << '\n';
             cur_lines -> pop_front();
