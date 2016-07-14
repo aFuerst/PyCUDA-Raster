@@ -73,19 +73,19 @@ void serialCalc::run_func(){
 
     //Next, grab first two rows of data
     for(i=0; i<2; i++){
-            std::cout << "Time to tryhard\n";
+        std::cout << "Time to tryhard\n";
         //////////////////////LOCK/////////////////////////
-            boost::mutex::scoped_lock lock(*input_buffer_lock);
-            std::cout << "lock acquired " << std::endl;
-            while(input_buffer -> size() == 0){
-                input_buffer_available -> wait(*input_buffer_lock);
-            }   
-            std::cout << "taking the shot" << std::endl;
-            //DONT pop anything from cur_lines yet, need to fill with three rows.
-            cur_lines->push_back(input_buffer -> front());
-            input_buffer -> pop_front();
-            input_buffer_available -> notify_one();
-            //input_buffer_lock -> unlock();
+        boost::mutex::scoped_lock lock(*input_buffer_lock);
+        std::cout << "lock acquired " << std::endl;
+        while(input_buffer -> size() == 0){
+            input_buffer_available -> wait(*input_buffer_lock);
+        }   
+        std::cout << "taking the shot" << std::endl;
+        //DONT pop anything from cur_lines yet, need to fill with three rows.
+        cur_lines->push_back(input_buffer -> front());
+        input_buffer -> pop_front();
+        input_buffer_available -> notify_one();
+        //input_buffer_lock -> unlock();
         ////////////////////UNLOCK/////////////////////////
         count++;
     }
@@ -101,16 +101,15 @@ void serialCalc::run_func(){
         std::deque< std::deque <double> >* output_buffer =  outBuffers -> at(q);
         //////////////////////LOCK/////////////////////////
         // send calculated line into output buffer  ///////
-            std::cout << "Hot potato!" << std::endl;
-            boost::mutex::scoped_lock lock(*output_buffer_lock);
-            std::cout << "Ah! It burns!" << std::endl;
-            while(output_buffer -> size() == 0){
-                output_buffer_available -> wait(*output_buffer_lock);
-            }
-            output_buffer -> push_back(temp);
-            output_buffer_available -> notify_one();
-            std::cout << "'Tis gone." << std::endl;
-            //output_buffer_lock -> unlock();
+        std::cout << "Hot potato!" << std::endl;
+        boost::mutex::scoped_lock lock(*output_buffer_lock);
+        std::cout << "Ah! It burns!" << std::endl;
+        while(output_buffer -> size() == MAX_BUFF_SIZE){
+            output_buffer_available -> wait(*output_buffer_lock);
+        }
+        output_buffer -> push_back(temp);
+        output_buffer_available -> notify_one();
+        std::cout << "'Tis gone." << std::endl;
     }
     temp.clear();
     ////////////////////UNLOCK/////////////////////////
@@ -129,7 +128,6 @@ void serialCalc::run_func(){
             cur_lines->push_back(input_buffer -> front());
             input_buffer -> pop_front();
             input_buffer_available -> notify_one();
-            //input_buffer_lock -> unlock();
         } while(false);
         ////////////////////UNLOCK/////////////////////////
         count++;
@@ -143,13 +141,12 @@ void serialCalc::run_func(){
             std::deque< std::deque <double> >* output_buffer =  outBuffers -> at(q);
             //////////////////////LOCK/////////////////////////
             // send calculated line into output buffer  ///////
-                boost::mutex::scoped_lock lock(*output_buffer_lock);
-                while(output_buffer -> size() == 0){
-                    output_buffer_available -> wait(*output_buffer_lock);
-                }
-                output_buffer -> push_back(temp);
-                output_buffer_available -> notify_one();
-                //output_buffer_lock -> unlock();
+            boost::mutex::scoped_lock lock(*output_buffer_lock);
+            while(output_buffer -> size() == MAX_BUFF_SIZE){
+                output_buffer_available -> wait(*output_buffer_lock);
+            }
+            output_buffer -> push_back(temp);
+            output_buffer_available -> notify_one();
         }
         ////////////////////UNLOCK/////////////////////////
         temp.clear();
@@ -169,12 +166,11 @@ void serialCalc::run_func(){
         //////////////////////LOCK/////////////////////////
         // send calculated line into output buffer  ///////
         boost::mutex::scoped_lock lock(*output_buffer_lock);
-        while(output_buffer -> size() == 0){
+        while(output_buffer -> size() == MAX_BUFF_SIZE){
             output_buffer_available -> wait(*output_buffer_lock);
         }
         output_buffer -> push_back(temp);
         output_buffer_available -> notify_one();
-        //output_buffer_lock -> unlock();
         ////////////////////UNLOCK/////////////////////////
         temp.clear();
     }
