@@ -56,14 +56,12 @@ void dataLoader::openFile(){
 }
 
 void dataLoader::readFile(){
-    std::cout<<"Alive\n";
     std::string line;
     int i = 0;
     std::deque< double > row;
 
     //Read file line by line
     while(std::getline(inFile, line)) {
-        //std::cout<<"Still alive " << i <<"\n";
         //removing whitespace in the begining of the lines
         line.erase(line.begin());
         std::istringstream ss(line);
@@ -74,18 +72,14 @@ void dataLoader::readFile(){
         }
         ///////////////LOCK////////////////////
         boost::mutex::scoped_lock lock(*buffer_lock);
-        //std::cout<<"STAYIN ALIVE\n";
         while(buffer -> size() == MAX_BUF_SIZE){
             buffer_available -> wait(*buffer_lock);
         }
         buffer -> push_back(row);
-        //std::cout << "in loader: " << i << std::endl;
         buffer_available -> notify_one();
-        std::cout << "sending notification" << std::endl;
-        buffer_lock -> unlock();
-        /////////////UNLOCK///////////////////
         row.clear();
         ++i;
+        /////////////UNLOCK///////////////////
    }
 
     if(inFile.eof()){
