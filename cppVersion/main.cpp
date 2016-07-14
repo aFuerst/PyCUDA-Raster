@@ -98,7 +98,7 @@ int main(int argc, char* argv[]){
         std::cout << functions.at(i) << std::endl;
     }*/
 
-    //boost::thread_group threads;
+    boost::thread_group saverThreads;
 
     // locks for load buffer
     boost::condition_variable_any* load_buffer_available = new boost::condition_variable_any;
@@ -113,16 +113,18 @@ int main(int argc, char* argv[]){
     std::vector< boost::condition_variable_any* > buffer_available_list;
     std::vector< boost::mutex* > buffer_lock_list;
     std::vector< boost::thread* > thread_list;
+    
 
-    for (unsigned i=0; i<outFiles.size(); ++i){
+    for (unsigned i=0; i<outFiles.size(); i++){
         // create all output buffers and locks
         outBuffers.push_back(new std::deque< std::deque <double> >);
         buffer_available_list.push_back(new boost::condition_variable_any);
         buffer_lock_list.push_back(new boost::mutex);
-        boost::thread saveThread(save_func, outFiles[i], outBuffers.at(i), &header, buffer_available_list.at(i), buffer_lock_list.at(i));
-        thread_list.push_back(&saveThread);
+        boost::thread* saveThread = new boost::thread(save_func, outFiles[i], outBuffers.at(i), &header, buffer_available_list.at(i), buffer_lock_list.at(i));
+        saverThreads.add_thread(saveThread);
     }
 
+    //boost::thread saveThread(save_func, outFiles[0], outBuffers.at(0), &header, buffer_available_list.at(0), buffer_lock_list.at(0));
     boost::thread calcThread(calc_func, loadBuffer, &functions, &header, load_buffer_available, load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
     
     std::cout << "joining threads" << std::endl;
@@ -132,13 +134,18 @@ int main(int argc, char* argv[]){
     //saveThread.join();
     calcThread.join();
     std::cout << "calc thread joined" << std::endl;
-    for (unsigned i=0; i<thread_list.size(); ++i){
-        thread_list.at(i) -> join();
-    }
+
+    saverThreads.join_all();
+
+    std::cout << "save threads joined" << std::endl;
 
     delete load_buffer_available;
     delete load_buffer_lock;
     delete loadBuffer;
+    outBuffers.clear();
+    buffer_available_list.clear();
+    buffer_lock_list.clear();
+
     std::cout << "END\n";
     return 0;
 }
