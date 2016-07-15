@@ -11,6 +11,9 @@
 #include "serialCalc.h"
 #include "esriHeader.h"
 
+/*
+    Function that grabs header information from an asc file and returns it in a esriHeader struct
+*/
 esriHeader getHeader(std::string fileName){
     std::ifstream inFile;
     inFile.open(fileName.c_str());
@@ -59,6 +62,9 @@ esriHeader getHeader(std::string fileName){
     return toReturn;
 }
 
+/*
+    threading function that creates a dataLoader object and runs it
+*/
 void load_func(std::string inFile, std::deque< std::deque <double> >* loadBuffer, 
         boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
     dataLoader loader(inFile, loadBuffer, buffer_available, buffer_lock);
@@ -66,6 +72,9 @@ void load_func(std::string inFile, std::deque< std::deque <double> >* loadBuffer
 
 }
 
+/*
+    threading function that creates a serialCalc object and runs it
+*/
 void calc_func(std::deque< std::deque <double> >* loadBuffer, std::vector< std::string >* functions, esriHeader* header,
         boost::condition_variable_any* load_buffer_available, boost::mutex* load_buffer_lock, 
         std::vector< std::deque< std::deque <double> >* >* outBuffers, std::vector< boost::condition_variable_any* >* buffer_available_list,
@@ -76,6 +85,9 @@ void calc_func(std::deque< std::deque <double> >* loadBuffer, std::vector< std::
 
 }
 
+/*
+    threading function that creates a dataSaver object and runs it
+*/
 void save_func(std::string outFile ,std::deque< std::deque <double> >* saveBuffer, esriHeader* header, 
         boost::condition_variable_any* buffer_available, boost::mutex* buffer_lock){
     dataSaver save(outFile, saveBuffer, buffer_available, buffer_lock, header);
@@ -83,6 +95,9 @@ void save_func(std::string outFile ,std::deque< std::deque <double> >* saveBuffe
 
 }
 
+/*
+    Creates saver, loader and serialCalc threads along with necessary locks and buffers for all of them
+*/
 int main(int argc, char* argv[]){
     std::vector< std::string > outFiles;
     std::vector< std::string > functions;
@@ -93,12 +108,13 @@ int main(int argc, char* argv[]){
 
     esriHeader header = getHeader(argv[1]);
 
-    /*for (int i=0; i<outFiles.size(); i++){
+    /* Print out file name and functions */
+    /*
+    for (int i=0; i<outFiles.size(); i++){
         std::cout << outFiles.at(i) << std::endl;
         std::cout << functions.at(i) << std::endl;
-    }*/
-
-    boost::thread_group saverThreads;
+    }
+    */
 
     // locks for load buffer
     boost::condition_variable_any* load_buffer_available = new boost::condition_variable_any;
@@ -112,11 +128,11 @@ int main(int argc, char* argv[]){
     std::vector< std::deque< std::deque <double> >* > outBuffers;
     std::vector< boost::condition_variable_any* > buffer_available_list;
     std::vector< boost::mutex* > buffer_lock_list;
-    std::vector< boost::thread* > thread_list;
     
-
+    /*  Create a saver thread for each output file specified by arguments */
+    boost::thread_group saverThreads;
     for (unsigned i=0; i<outFiles.size(); i++){
-        // create all output buffers and locks
+        // create needed output buffers and locks
         outBuffers.push_back(new std::deque< std::deque <double> >);
         buffer_available_list.push_back(new boost::condition_variable_any);
         buffer_lock_list.push_back(new boost::mutex);
@@ -124,21 +140,17 @@ int main(int argc, char* argv[]){
         saverThreads.add_thread(saveThread);
     }
 
-    //boost::thread saveThread(save_func, outFiles[0], outBuffers.at(0), &header, buffer_available_list.at(0), buffer_lock_list.at(0));
     boost::thread calcThread(calc_func, loadBuffer, &functions, &header, load_buffer_available, load_buffer_lock, &outBuffers, &buffer_available_list, &buffer_lock_list);
-    
-    std::cout << "joining threads" << std::endl;
 
     loadThread.join();
     std::cout << "load thread joined" << std::endl;
-    //saveThread.join();
     calcThread.join();
     std::cout << "calc thread joined" << std::endl;
 
     saverThreads.join_all();
-
     std::cout << "save threads joined" << std::endl;
 
+    /* Memory cleanup */
     delete load_buffer_available;
     delete load_buffer_lock;
     delete loadBuffer;
@@ -146,7 +158,7 @@ int main(int argc, char* argv[]){
     buffer_available_list.clear();
     buffer_lock_list.clear();
 
-    std::cout << "END\n";
+    std::cout << "Computation completed" << std::endl;
     return 0;
 }
 

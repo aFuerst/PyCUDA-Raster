@@ -14,28 +14,43 @@
 
 const static int MAX_BUF_SIZE = 70000;
 
-dataLoader::dataLoader(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available, boost::mutex *buffer_lock){
-    std::cout << "initializing loader\n";
-    this -> fileName = fileName;
-    this -> buffer = buffer;
-    this -> buffer_available = buffer_available;
-    this -> buffer_lock = buffer_lock;
+/*
+    Constructor for dataLoader  
+    parameters: 
+        _fileName - path to asc file to be used as input
+        _buffer - pointer to shared buffer to pass data into    
+        _buffer_available - boost condition to notify when buffer is available
+        _buffer_lock - lock on shared buffer to ensure thread-safe access
+*/
+dataLoader::dataLoader(std::string _fileName, std::deque<std::deque <double> >* _buffer, 
+                        boost::condition_variable_any* _buffer_available, boost::mutex* _buffer_lock){
+    this -> fileName = _fileName;
+    this -> buffer = _buffer;
+    this -> buffer_available = _buffer_available;
+    this -> buffer_lock = _buffer_lock;
     openFile();
     readHeader();
 }
 
+/*
+    Simple destructor for dataLoader
+    just closes input file
+*/
 dataLoader::~dataLoader(){
     inFile.close();
 }
 
 /*
-    Starts everything object needs to do
+    Opens file, reads header, and starts reading input file
 */
 void dataLoader::run(){
-    std::cout<< "Starting to read\n";
+    std::cout<< "Starting to read" << std::endl;
     readFile();
 }
 
+/*
+    return header info as a string
+*/
 std::string dataLoader::getHeader(){
     std::stringstream s;
     s << "ncols = " << ncols << "\n";
@@ -47,6 +62,9 @@ std::string dataLoader::getHeader(){
     return s.str();
 }
 
+/*
+    Opens fileName given to constructor and puts ifstream object in inFile
+*/
 void dataLoader::openFile(){
     inFile.open(fileName.c_str());
     if(!inFile.is_open()) {
@@ -55,6 +73,11 @@ void dataLoader::openFile(){
     }
 }
 
+/*
+    Reads inFile one line at a time and passes the double version of 
+    the asc line into its shaed buffer. Assumes the file pointer    
+    is at the first line of data 
+*/
 void dataLoader::readFile(){
     std::string line;
     int i = 0;
@@ -88,6 +111,11 @@ void dataLoader::readFile(){
     return;
 }
 
+/*
+    Reads the first 6 lines of the header to get raster information
+    store them in instance vars. Requires file to already be opened
+    Advances the file pointer to the first line of actual data
+*/
 void dataLoader::readHeader(){
     int temp, count;
 	temp = count = 0;

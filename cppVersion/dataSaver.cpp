@@ -13,25 +13,43 @@
 #include "dataSaver.h"
 #include "esriHeader.h"
 
-dataSaver::dataSaver(std::string fileName, std::deque<std::deque <double> > *buffer, boost::condition_variable_any *buffer_available,
-		 boost::mutex *buffer_lock, esriHeader* header)
+/*
+    Constructor for dataSaver
+    parameters: 
+        _fileName - path to asc file to be used as output
+        _buffer - pointer to shared buffer to pass data into    
+        _buffer_available - boost condition to notify when buffer is available
+        _buffer_lock - lock on shared buffer to ensure thread-safe access
+        _header - esriHeader object with header infotmation to write at beginning of file
+*/
+dataSaver::dataSaver(std::string _fileName, std::deque<std::deque <double> > *_buffer, boost::condition_variable_any *_buffer_available,
+		 boost::mutex *_buffer_lock, esriHeader* _header)
 {
-	this -> fileName = fileName;
-	this -> buffer = buffer;
-	this -> buffer_available = buffer_available;
-	this -> buffer_lock = buffer_lock;
-    this -> header = header;
-	//openFile();
+	this -> fileName = _fileName;
+	this -> buffer = _buffer;
+	this -> buffer_available = _buffer_available;
+	this -> buffer_lock = _buffer_lock;
+    this -> header = _header;
 }
 
 /*
-    Starts everything object needs to do
+    Deconstructor, closes output file
+*/
+dataSaver::~dataSaver(){
+    outFile.close();
+}
+
+/*
+    Opens file and begins write_func to print data to file
 */
 void dataSaver::run(){
     openFile();
     write_func();
 }
 
+/*
+    Opens file and writes header information to it
+*/
 void dataSaver::openFile()
 {
 	//open outputfile
@@ -50,7 +68,9 @@ void dataSaver::openFile()
 	outFile << "NODATA_value " << header -> NODATA    << '\n';
 }
 
-//write data to the output file
+/*
+    Write data to the output file a single line at a time from its input buffer 
+*/
 void dataSaver::write_func()
 {
     std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque < double> >;

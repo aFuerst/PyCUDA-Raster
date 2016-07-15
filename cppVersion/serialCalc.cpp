@@ -13,22 +13,41 @@
 #include "serialCalc.h"
 #include "esriHeader.h"
 
+/*
+    Constructor for dataSaver
+    parameters: 
+        _fileName - path to asc file to be used as output
+        _loadBuffer - pointer to shared buffer to receive data from    
+        _load_buffer_available - boost condition to notify when load buffer is available
+        _load_buffer_lock - lock on shared buffer to ensure thread-safe access
+        _header - esriHeader object with header infotmation to write at beginning of file
+        _functions - vector of function names to calculate
+        _outBuffers - vector of out buffers to pass calculated data to
+        _buffer_available_list - vector of boost conditions for outBuffers
+        _buffer_lock_list - vector of boost locks for outBuffers
+*/
+serialCalc::serialCalc(std::deque< std::deque <double> >* _loadBuffer, std::vector< std::string >* _functions, esriHeader* _header,
+                       boost::condition_variable_any* _load_buffer_available, boost::mutex* _load_buffer_lock, 
+                       std::vector< std::deque< std::deque <double> >* >* _outBuffers, std::vector< boost::condition_variable_any* >* _buffer_available_list,
+                       std::vector< boost::mutex* >* _buffer_lock_list){
 
-serialCalc::serialCalc(std::deque< std::deque <double> >* loadBuffer, std::vector< std::string >* functions, esriHeader* header,
-                       boost::condition_variable_any* load_buffer_available, boost::mutex* load_buffer_lock, 
-                       std::vector< std::deque< std::deque <double> >* >* outBuffers, std::vector< boost::condition_variable_any* >* buffer_available_list,
-                       std::vector< boost::mutex* >* buffer_lock_list){
+    this -> functions = _functions;
 
-    this -> functions = functions;
+    this -> input_buffer = _loadBuffer;
+    this -> input_buffer_available = _load_buffer_available;
+    this -> input_buffer_lock = _load_buffer_lock;
 
-    this -> input_buffer = loadBuffer;
-    this -> input_buffer_available = load_buffer_available;
-    this -> input_buffer_lock = load_buffer_lock;
+    this -> outBuffers = _outBuffers;
+    this -> buffer_available_list = _buffer_available_list;
+    this -> buffer_lock_list = _buffer_lock_list;
+    this -> header_info = _header;
+}
 
-    this -> outBuffers = outBuffers;
-    this -> buffer_available_list = buffer_available_list;
-    this -> buffer_lock_list = buffer_lock_list;
-    this -> header_info = header;
+/*
+    Deconstructor, currently does nothing special
+*/
+serialCalc::~serialCalc(){
+
 }
 
 /*
@@ -38,6 +57,9 @@ void serialCalc::run(){
     run_func();
 }
 
+/*
+    Determines which GIS function to compute and calls that function
+*/
 double serialCalc::calculate(std::deque< std::deque <double> >* cur_lines, int i, std::string function){
     switch(function[0]){
         case 's':
@@ -61,11 +83,9 @@ double serialCalc::calculate(std::deque< std::deque <double> >* cur_lines, int i
     passes that calculated row into output file
 */
 void serialCalc::run_func(){
-    std::cout << "in run_func" << std::endl;
     std::deque< std::deque <double> >* cur_lines = new std::deque< std::deque <double> >;
     int count=0;
     int i;
-    //double cur_slope[header_info -> ncols];
     std::deque<double> temp;
 
     //First push back NODATA row for calculating sloep of first row
@@ -73,23 +93,19 @@ void serialCalc::run_func(){
 
     //Next, grab first two rows of data
     for(i=0; i<2; i++){
-        std::cout << "Time to tryhard\n";
         //////////////////////LOCK/////////////////////////
         boost::mutex::scoped_lock lock(*input_buffer_lock);
-        std::cout << "lock acquired " << std::endl;
         while(input_buffer -> size() == 0){
             input_buffer_available -> wait(*input_buffer_lock);
         }   
-        std::cout << "taking the shot" << std::endl;
         //DONT pop anything from cur_lines yet, need to fill with three rows.
         cur_lines->push_back(input_buffer -> front());
         input_buffer -> pop_front();
         input_buffer_available -> notify_one();
-        //input_buffer_lock -> unlock();
         ////////////////////UNLOCK/////////////////////////
         count++;
     }
-    std::cout << "grabbed first two data lines" << std::endl;
+    //std::cout << "grabbed first two data lines" << std::endl;
     for(unsigned q = 0; q < functions -> size(); ++q){
         //Calculate and write out first row
 
@@ -101,22 +117,18 @@ void serialCalc::run_func(){
         std::deque< std::deque <double> >* output_buffer =  outBuffers -> at(q);
         //////////////////////LOCK/////////////////////////
         // send calculated line into output buffer  ///////
-        std::cout << "Hot potato!" << std::endl;
         boost::mutex::scoped_lock lock(*output_buffer_lock);
-        std::cout << "Ah! It burns!" << std::endl;
         while(output_buffer -> size() == MAX_BUFF_SIZE){
             output_buffer_available -> wait(*output_buffer_lock);
         }
         output_buffer -> push_back(temp);
         output_buffer_available -> notify_one();
-        std::cout << "'Tis gone." << std::endl;
     }
     temp.clear();
     ////////////////////UNLOCK/////////////////////////
 
     //Enter main while loop
     while (count < header_info -> nrows){
-        std::cout << "inside loop" << std::endl;
         cur_lines->pop_front();
         //////////////////////LOCK/////////////////////////
         // get new line
@@ -151,7 +163,6 @@ void serialCalc::run_func(){
         ////////////////////UNLOCK/////////////////////////
         temp.clear();
     }
-    std::cout << "loop done" << std::endl;
     //Push back another NODATA row to calculate the last row with.
     cur_lines->pop_front();
     cur_lines->push_back(std::deque<double> (header_info -> ncols, header_info -> NODATA));
@@ -208,6 +219,9 @@ double serialCalc::calc_slope(std::deque< std::deque <double> >* cur_lines, int 
         return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
 }
 
+/*
+    calculates aspect for a single cell at col using a 3x3 kernel
+*/
 double serialCalc::calc_aspect(std::deque< std::deque <double> >* cur_lines, int col){
     if (cur_lines->at(1)[col] == header_info -> NODATA){
         return header_info -> NODATA;
@@ -244,6 +258,9 @@ double serialCalc::calc_aspect(std::deque< std::deque <double> >* cur_lines, int
         }
 }
 
+/*
+    calculates hillshade for a single cell at col using a 3x3 kernel
+*/
 double serialCalc::calc_hillshade(std::deque< std::deque <double> >* cur_lines, int col){
     if (cur_lines->at(1)[col] == header_info -> NODATA){
         return header_info -> NODATA;
@@ -289,6 +306,9 @@ double serialCalc::calc_hillshade(std::deque< std::deque <double> >* cur_lines, 
     }
 }
 
+/*
+    calculates aspect needed for hillshade
+*/
 double serialCalc::hillshade_aspect(double dz_dx, double dz_dy){
     double aspect;
     if(dz_dx != 0){
