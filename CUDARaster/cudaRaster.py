@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
- LinkerTester
+ CUDARaster
                                  A QGIS plugin
- Test calling an outside script from qgis
+ Utilize NVIDIA GPU to do raster calculations
                               -------------------
-        begin                : 2016-06-16
+        begin                : 2016-07-15
         git sha              : $Format:%H$
-        copyright            : (C) 2016 by af
-        email                : af
+        copyright            : (C) 2016 by Alex Feurst, Charles Kazer, William Hoffman
+        email                : ckazer1@swarthmore.edu
  ***************************************************************************/
 
 /***************************************************************************
@@ -21,27 +21,18 @@
  ***************************************************************************/
 """
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtGui import QAction, QIcon, QFileDialog
+from PyQt4.QtGui import QAction, QIcon, QFileDialog, QCheckBox
 # Initialize Qt resources from file resources.py
 import resources
 # Import the code for the dialog
-from link_test_dialog import LinkerTesterDialog
+from cudaRaster_dialog import CUDARasterDialog
 import os.path
 
 import scheduler
 
-class LinkerTester:
+class CUDARaster:
     """QGIS Plugin Implementation."""
 
-
-    def select_output_file(self):
-        filename = QFileDialog.getSaveFileName(self.dlg, "Select output file ","", '*.*')
-        self.dlg.outputLineEdit.setText(filename)
-		
-    def select_input_file(self):
-        filename = QFileDialog.getOpenFileName(self.dlg, "Select input file ","", '*.*')
-        self.dlg.inputLineEdit.setText(filename)
-	
     def __init__(self, iface):
         """Constructor.
 
@@ -59,7 +50,7 @@ class LinkerTester:
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
-            'LinkerTester_{}.qm'.format(locale))
+            'CUDARaster_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
@@ -69,20 +60,24 @@ class LinkerTester:
                 QCoreApplication.installTranslator(self.translator)
 
         # Create the dialog (after translation) and keep reference
-        self.dlg = LinkerTesterDialog()
+        self.dlg = CUDARasterDialog()
 
         # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&Link Test')
+        self.menu = self.tr(u'&CUDA Raster')
         # TODO: We are going to let the user set this up in a future iteration
-        self.toolbar = self.iface.addToolBar(u'LinkerTester')
-        self.toolbar.setObjectName(u'LinkerTester')
-		
-        self.dlg.inputLineEdit.clear()
-        self.dlg.inputButton.clicked.connect(self.select_input_file)
+        self.toolbar = self.iface.addToolBar(u'CUDARaster')
+        self.toolbar.setObjectName(u'CUDARaster')
+
+        self.dlg.input_line.clear()
+        self.dlg.input_button.clicked.connect(self.select_input_file)
         
-        self.dlg.outputLineEdit.clear()
-        self.dlg.outputButton.clicked.connect(self.select_output_file)
+        self.dlg.output_line.clear()
+        self.dlg.output_button.clicked.connect(self.select_output_folder)
+
+        self.dlg.slope_check.setChecked(False)
+        self.dlg.aspect_check.setChecked(False)
+        self.dlg.hillshade_check.setChecked(False)
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -97,7 +92,7 @@ class LinkerTester:
         :rtype: QString
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('LinkerTester', message)
+        return QCoreApplication.translate('CUDARaster', message)
 
 
     def add_action(
@@ -165,7 +160,7 @@ class LinkerTester:
             self.toolbar.addAction(action)
 
         if add_to_menu:
-            self.iface.addPluginToMenu(
+            self.iface.addPluginToRasterMenu(
                 self.menu,
                 action)
 
@@ -176,10 +171,10 @@ class LinkerTester:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ':/plugins/LinkerTester/icon.png'
+        icon_path = ':/plugins/CUDARaster/icon.png'
         self.add_action(
             icon_path,
-            text=self.tr(u'slope'),
+            text=self.tr(u'CUDA Raster'),
             callback=self.run,
             parent=self.iface.mainWindow())
 
@@ -187,23 +182,24 @@ class LinkerTester:
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
-            self.iface.removePluginMenu(
-                self.tr(u'&Link Test'),
+            self.iface.removePluginRasterMenu(
+                self.tr(u'&CUDA Raster'),
                 action)
             self.iface.removeToolBarIcon(action)
         # remove the toolbar
         del self.toolbar
 
+    def select_output_folder(self):
+        foldername = QFileDialog.getExistingDirectory(self.dlg, "Select output folder ","")
+        self.dlg.output_line.setText(foldername)
+
+    def select_input_file(self):
+        filename = QFileDialog.getOpenFileName(self.dlg, "Select input file ","", "Supported files (*.asc *.tif)")
+        self.dlg.input_line.setText(filename)
 
     def run(self):
+        from os import name
         """Run method that performs all the real work"""
-		
-        #layers = self.iface.legendInterface().layers()
-        #layer_list = []
-        #for layer in layers:
-        #    layer_list.append(layer.name())
-        #    self.dlg.comboBox.addItems(layer_list)
-		
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
@@ -212,5 +208,23 @@ class LinkerTester:
         if result:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
-            # slope_serial.main(self.dlg.inputLineEdit.text(),self.dlg.outputLineEdit.text())
-            scheduler.run(self.dlg.inputLineEdit.text(), self.dlg.outputLineEdit.text())
+            functions = []
+            outputs = []
+            input_file = self.dlg.input_line.text()
+            extension = self.dlg.input_line.text()[-4:]
+            #TODO: Check if this works on windows
+            if name == 'posix':
+                input_file = input_file[input_file.rfind('/'):-4]
+            else:
+                input_file = input_file[input_file.rfind('\\'):-4]
+            if self.dlg.slope_check.isChecked():
+                functions.append("slope")
+            if self.dlg.aspect_check.isChecked():
+                functions.append("aspect")
+            if self.dlg.hillshade_check.isChecked():
+                functions.append("hillshade")
+            for function in functions:
+                outputs.append(self.dlg.output_line.text()\
+                             + input_file\
+                             + "_" + function + extension) 
+            scheduler.run(self.dlg.input_line.text(), outputs, functions)

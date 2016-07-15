@@ -1,12 +1,12 @@
 #/***************************************************************************
-# LinkerTester
+# CUDARaster
 #
-# Test calling an outside script from qgis
+# Utilize NVIDIA GPU to do raster calculations
 #							 -------------------
-#		begin				: 2016-06-16
+#		begin				: 2016-07-15
 #		git sha				: $Format:%H$
-#		copyright			: (C) 2016 by af
-#		email				: af
+#		copyright			: (C) 2016 by Alex Feurst, Charles Kazer, William Hoffman
+#		email				: ckazer1@swarthmore.edu
 # ***************************************************************************/
 #
 #/***************************************************************************
@@ -38,15 +38,15 @@ LOCALES =
 # translation
 SOURCES = \
 	__init__.py \
-	link_test.py link_test_dialog.py
+	cudaRaster.py cudaRaster_dialog.py
 
-PLUGINNAME = LinkerTester
+PLUGINNAME = CUDARaster
 
 PY_FILES = \
 	__init__.py \
-	link_test.py link_test_dialog.py
+	cudaRaster.py cudaRaster_dialog.py
 
-UI_FILES = link_test_dialog_base.ui
+UI_FILES = cudaRaster_dialog_base.ui
 
 EXTRAS = metadata.txt icon.png
 

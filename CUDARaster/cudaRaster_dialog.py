@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
- LinkerTesterDialog
+ CUDARasterDialog
                                  A QGIS plugin
- Test calling an outside script from qgis
+ Utilize NVIDIA GPU to do raster calculations
                              -------------------
-        begin                : 2016-06-16
+        begin                : 2016-07-15
         git sha              : $Format:%H$
-        copyright            : (C) 2016 by af
-        email                : af
+        copyright            : (C) 2016 by Alex Feurst, Charles Kazer, William Hoffman
+        email                : ckazer1@swarthmore.edu
  ***************************************************************************/
 
 /***************************************************************************
@@ -26,13 +26,13 @@ import os
 from PyQt4 import QtGui, uic
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'link_test_dialog_base.ui'))
+    os.path.dirname(__file__), 'cudaRaster_dialog_base.ui'))
 
 
-class LinkerTesterDialog(QtGui.QDialog, FORM_CLASS):
+class CUDARasterDialog(QtGui.QDialog, FORM_CLASS):
     def __init__(self, parent=None):
         """Constructor."""
-        super(LinkerTesterDialog, self).__init__(parent)
+        super(CUDARasterDialog, self).__init__(parent)
         # Set up the user interface from Designer.
         # After setupUI you can access any designer object by doing
         # self.<objectname>, and you can use autoconnect slots - see

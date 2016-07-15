@@ -1,0 +1,39 @@
+# This file contains metadata for your plugin. Since 
+# version 2.0 of QGIS this is the proper way to supply 
+# information about a plugin. The old method of 
+# embedding metadata in __init__.py will 
+# is no longer supported since version 2.0.
+
+# This file should be included when you package your plugin.# Mandatory items:
+
+[general]
+name=CUDA Raster
+qgisMinimumVersion=2.0
+description=Utilize NVIDIA GPU to do raster calculations
+version=1.0
+author=Alex Feurst, Charles Kazer, William Hoffman
+email=ckazer1@swarthmore.edu
+
+about=This plugin uses CUDA enabled graphics cards to perform raster calculations. The QGIS GUI allows you to select an input file, output file and what kind of calculation you would like to do. This plugin currently supports reading and writing .asc files and .tif files. If you navigate to the plugin folder, it can also be used as a command line utility where multiple calculations can be run in one job. See the README there for more information on using the plugin as a command line utility separate from QGIS. Dependencies: CUDA 6.0 or higher https://developer.nvidia.com/cuda-downloads Numpy http://www.numpy.org/ Python GDAL https://pypi.python.org/pypi/GDAL/ PyCUDA https://mathema.tician.de/software/pycuda/ You will need to make sure that the folder where you have installed CUDA is set to your path before starting QGIS and trying to install this plugin.
+
+tracker=https://github.com/aFuerst/Lembo-REU-2016/issues
+repository=https://github.com/aFuerst/Lembo-REU-2016
+# End of mandatory metadata
+
+# Recommended items:
+
+# Uncomment the following line and add your changelog:
+# changelog=
+
+# Tags are comma separated with spaces allowed
+tags=
+
+homepage=https://github.com/aFuerst/Lembo-REU-2016
+category=Raster
+icon=icon.png
+# experimental flag
+experimental=True
+
+# deprecated flag (applies to the whole plugin, not just a single version)
+deprecated=False
+

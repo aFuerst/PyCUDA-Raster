@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
- LinkerTester
+ CUDARaster
                                  A QGIS plugin
- Test calling an outside script from qgis
+ Utilize NVIDIA GPU to do raster calculations
                              -------------------
-        begin                : 2016-06-16
-        copyright            : (C) 2016 by af
-        email                : af
+        begin                : 2016-07-15
+        copyright            : (C) 2016 by Alex Feurst, Charles Kazer, William Hoffman
+        email                : ckazer1@swarthmore.edu
         git sha              : $Format:%H$
  ***************************************************************************/
 
@@ -25,11 +25,11 @@
 
 # noinspection PyPep8Naming
 def classFactory(iface):  # pylint: disable=invalid-name
-    """Load LinkerTester class from file LinkerTester.
+    """Load CUDARaster class from file CUDARaster.
 
     :param iface: A QGIS interface instance.
     :type iface: QgsInterface
     """
     #
-    from .link_test import LinkerTester
-    return LinkerTester(iface)
+    from .cudaRaster import CUDARaster
+    return CUDARaster(iface)
