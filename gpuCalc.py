@@ -22,22 +22,22 @@ class GPUCalculator(Process):
 
     paramaters:
         header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
-        _inputPipe - a Pipe object to read information from
+        _input_pipe - a Pipe object to read information from
         _outputPipe - a Pipe object to send information to
-        functionTypes - list of strings that are supported function names as strings
+        function_types - list of strings that are supported function names as strings
 
     creates empty instance variables needed later
     """
-    def __init__(self, header, _inputPipe, _outputPipes, functionTypes):
+    def __init__(self, header, _input_pipe, _output_pipes, function_types):
         Process.__init__(self)
 
         # CUDA device info
         self.device = None
         self.context = None
 
-        self.inputPipe = _inputPipe
-        self.outputPipes = _outputPipes 
-        self.functions = functionTypes
+        self.input_pipe = _input_pipe
+        self.output_pipes = _output_pipes 
+        self.functions = function_types
     
         #unpack header info
         self.totalCols = header[0]
@@ -77,30 +77,30 @@ class GPUCalculator(Process):
 
         self._gpuAlloc()
 
-        self.kernel = self.get_kernel()
+        self.kernel = self._getKernel()
         self.func = self.kernel.get_function("raster_function")
 
         #Process data while we continue to receive input
         count = 0
-        while self.recv_data(count):
+        while self._recvData(count):
             #Copy input data to GPU
             cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
             for i in range(len(self.functions)):
-                self.process_data(self.functions[i])
+                self._processData(self.functions[i])
                 #Get data back from GPU
                 cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
-                self.write_data(count, self.outputPipes[i])
+                self._writeData(count, self.output_pipes[i])
 
             count += (self.maxPossRows-2)  # -2 because of buffer rows
             print "Page done... %.3f %% completed" % ((float(count) / float(self.totalRows)) * 100)
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):
-            self.process_data(self.functions[i])
+            self._processData(self.functions[i])
             cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu) 
-            self.write_data(count, self.outputPipes[i])
+            self._writeData(count, self.output_pipes[i])
 
-        for pipe in self.outputPipes:
+        for pipe in self.output_pipes:
             pipe.close()
 
         print "GPU calculations finished"
@@ -128,7 +128,7 @@ class GPUCalculator(Process):
         self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
 
     """
-    recv_data
+    _recvData
 
     Receives a page worth of data from the input pipe. The input pipe comes
     from dataLoader.py. Copies over 2 rows from the previous page so the GPU 
@@ -136,7 +136,7 @@ class GPUCalculator(Process):
     If the pipe closes, fill the rest of the page with NODATA, and return false
     to indicate that we should break out of the processing loop.
     """
-    def recv_data(self, count):
+    def _recvData(self, count):
         if count == 0:
             #If this is the first page, insert a buffer row
             for col in range(self.totalCols):
@@ -151,25 +151,23 @@ class GPUCalculator(Process):
 
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
-            #print row_count, count
             try:
-                # check if something is in the pipe for 5 seconds
                 if count + row_count > self.totalRows:
                     # end of file reached       
                     cur_row = None             
-                    raise EOFError
+                    for col in range(self.totalCols):
+                        self.to_gpu_buffer[row_count][col] = self.NODATA
+                    return False
                 else:
-                    cur_row = self.inputPipe.recv()
+                    cur_row = self.input_pipe.recv()
 
                 for col in range(self.totalCols):
                     self.to_gpu_buffer[row_count][col] = cur_row[col]
 
-            #Pipe was closed, no more input data
+            #Pipe was closed unexpectedly
             except EOFError:
-                #Write a NODATA buffer row
-                for col in range(self.totalCols):
-                    self.to_gpu_buffer[row_count][col] = self.NODATA
-                return False
+                print "Pipe closed unexpectedly."
+                self.stop()
 
             row_count += 1
             
@@ -181,13 +179,12 @@ class GPUCalculator(Process):
 
 
     """
-    process_data
+    _processData
 
     Using the given kernel code packed in mod, allocates memory on the GPU,
-    copies input data from a pagelocked buffer, runs the kernel and copies 
-    the output to a second pagelocked buffer
+    and runs the kernel.
     """
-    def process_data(self, funcType):
+    def _processData(self, funcType):
         #GPU layout information
         grid = (16,16)
         block = (32,32,1)
@@ -203,7 +200,7 @@ class GPUCalculator(Process):
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
             (np.float64, 'cellSize', self.cellsize),
-            (np.int32, 'function', self.getFunctionVal(funcType))
+            (np.int32, 'function', self._getFunctionVal(funcType))
             ])
 
         stc.copy_to_gpu()
@@ -211,7 +208,13 @@ class GPUCalculator(Process):
         #Call GPU kernel
         self.func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
 
-    def getFunctionVal(self, func):
+    """
+    _getFunctionVal
+
+    returns the case needed for a particular function to run the proper CUDA
+    code
+    """
+    def _getFunctionVal(self, func):
         if func == "slope":
             return 0        
         elif func == "aspect":
@@ -223,25 +226,15 @@ class GPUCalculator(Process):
             raise NotImplemented
 
     """
-    write_data
+    _writeData
 
     Writes results to output pipe. This pipe goes to dataSaver.py
     """
-    def write_data(self, count, outPipe):
-        """
-        #skip first and last rows, since they were buffers in the computation
-        max = self.maxPossRows
-        # see if written out more than total number of rows plus a small buffer
-        # pipe.send seems to sopt working after too many sends and nothing is taken off
-        if count + max > self.totalRows:
-            max = self.totalRows - count
-        for row in range(1, max):
-            outPipe.send(self.from_gpu_buffer[row])
-        """
+    def _writeData(self, count, out_pipe):
         for row in range(1, self.maxPossRows-1):
             if count + row > self.totalRows:
                 break
-            outPipe.send(self.from_gpu_buffer[row])
+            out_pipe.send(self.from_gpu_buffer[row])
     """
     stop 
 
@@ -254,19 +247,16 @@ class GPUCalculator(Process):
         exit(1)
 
     """
-    get_kernel
+    _getKernel
 
-    given a string argument, packages a module for that kernel.
+    Packages the kernel module.
     """
-    # NOTE: To create another kernel, add another if statement checking for
-    # the string you will identify the kernel by. Then return a SourceModule
-    # containing that kernel. Currently, our input/output code in recv_data
-    # and write_data assumes that the kernel will treat the first and last
-    # row of a given page as buffers that won't be written out.
-    # HOWEVER, recv_data is set up so that the last two rows of the preceeding
-    # page are used as the first two in the current one. This ensures that the
-    # last row of the preceeding page will still be analyzed.
-    def get_kernel(self):
+    # NOTE: To create another raster function, add another if statement to
+    # _getFunctionVal checking for the string you will identify the kernel by,
+    # another case to raster_function in getKernal, and the function code.
+    # The GPUCalculator class is set up to automatically insert buffer rows at
+    # the beginning and end of the file so that all rows are calculated correctly.
+    def _getKernel(self):
         mod = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>

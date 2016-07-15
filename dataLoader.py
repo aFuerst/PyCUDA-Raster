@@ -20,16 +20,16 @@ class dataLoader(Process):
     __init__
 
     paramaters:
-        inputFile - must be a valid file path as a string
-        output_pipe - a Pipe object to pass read information into
+        _input_file - must be a valid file path as a string
+        _output_pipe - a Pipe object to pass read information into
    
     opens the input file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, inputFile, output_pipe):
+    def __init__(self, _input_file, _output_pipe):
         Process.__init__(self)
-        self.output_pipe = output_pipe
-        self.file_name = inputFile
+        self.output_pipe = _output_pipe
+        self.file_name = _input_file
         self._openFile()
         self._readHeaderInfo()
         self.cur_line=""

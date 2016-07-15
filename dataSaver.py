@@ -21,18 +21,17 @@ class dataSaver(Process):
     __init__
 
     paramaters:
-        outputFile - must be a valid file path as a string
+        output_file - must be a valid file path as a string
         header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
         input_pipe - a Pipe object to read information from
 
     opens the output file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, outputFile,  header, input_pipe):
+    def __init__(self, _output_file,  header, _input_pipe):
         Process.__init__(self)
-        #self.outFile = None
-        self.fileName = outputFile 
-        self.input_pipe=input_pipe
+        self.file_name = _output_file 
+        self.input_pipe = _input_pipe
 
         #unpack header info
         self.totalCols = header[0]
@@ -41,7 +40,7 @@ class dataSaver(Process):
         self.NODATA = header[3]
         self.xllcorner = header[4]
         self.yllcorner = header[5]
-        if ".tif" in self.fileName:
+        if ".tif" in self.file_name:
             self.GeoT = header[6]
             self.prj = header[7]
 
@@ -52,7 +51,7 @@ class dataSaver(Process):
     """
     def run(self):
         self._openFile()
-        self.write_func()
+        self._writeFunc()
         self._closeFile()
 
     """
@@ -61,10 +60,10 @@ class dataSaver(Process):
     
     """
     def _closeFile(self):
-        if ".tif" in self.fileName:
+        if ".tif" in self.file_name:
             self.dataset.FlushCache()
-        elif ".asc" in self.fileName:
-            self.outFile.close()
+        elif ".asc" in self.file_name:
+            self.out_file.close()
 
     """
     stop
@@ -72,31 +71,31 @@ class dataSaver(Process):
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping saver ", self.fileName ," ..."
+        print "Stopping saver ", self.file_name ," ..."
         exit(1)
 
     """
     _openFile
 
-    opens outputFile and writes header information to it
+    opens output_file and writes header information to it
     stores open file object in instance variable 
     """
     def _openFile(self):
-        if exists(self.fileName):
-            print self.fileName, "already exists. Deleting it..."
-            remove(self.fileName)
-        if ".asc" in self.fileName:
+        if exists(self.file_name):
+            print self.file_name, "already exists. Deleting it..."
+            remove(self.file_name)
+        if ".asc" in self.file_name:
             try:
-                self.outFile = open(self.fileName, 'w')
+                self.out_file = open(self.file_name, 'w')
             except IOError:
-                print "Cannot open", self.fileName
+                print "Cannot open", self.file_name
                 self.stop()
             except ValueError:
                 print "Output file name was not a string"
                 self.stop()
 
             # write out header
-            self.outFile.write(
+            self.out_file.write(
                     "ncols %.0f\n"
                     "nrows %.0f\n"
                     "xllcorner %.2f\n"
@@ -105,35 +104,35 @@ class dataSaver(Process):
                     "NODATA_value %f\n"
                     % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
                     )
-        elif ".tif" in self.fileName:
+        elif ".tif" in self.file_name:
             self.driver = gdal.GetDriverByName('GTiff')
-            self.dataset = self.driver.Create(self.fileName, self.totalCols, self.totalRows, 1, gdal.GDT_Float64)
+            self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float64)
             self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
             self.dataset.SetGeoTransform(self.GeoT)
             self.dataset.SetProjection(self.prj)
 
     """
-    write_func
+    _writeFunc
 
-    takes data rows from input_pipe and writes them to outputFile
+    takes data rows from input_pipe and writes them to output_file
     writes exactly as many rows as defined in the header
     """
-    def write_func(self):
+    def _writeFunc(self):
         nrows = 0
         while nrows < self.totalRows:
             # get line from pipe
             try:
                 arr=self.input_pipe.recv()
             except EOFError:
-                print "Pipe empty"
-                return
-            if ".asc" in self.fileName: 
-                arr.tofile(self.outFile, sep=" ", format="%.3f")
-                self.outFile.write('\n')
-            elif ".tif" in self.fileName:
+                print "Pipe closed unexpectedly"
+                self.stop()
+            if ".asc" in self.file_name: 
+                arr.tofile(self.out_file, sep=" ", format="%.3f")
+                self.out_file.write('\n')
+            elif ".tif" in self.file_name:
                 self.dataset.GetRasterBand(1).WriteArray(np.float64([arr]), 0, nrows-1)
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
             nrows+=1
-        print "Output %s written to disk" % self.fileName
+        print "Output %s written to disk" % self.file_name
 

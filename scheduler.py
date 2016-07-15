@@ -44,11 +44,9 @@ def run(inputFile, outputFiles, functions):
             print "Error encountered in GPU calculater, ending tasks"
             break
         sleep(1)
-    #loader.join()
-    #calc.join()
-    #saver.join()
 
 if __name__ == '__main__':
+    #If run from the command line, parse arguments.
     from sys import argv
     outFiles = []
     funcs = []
