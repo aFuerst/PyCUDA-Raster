@@ -102,20 +102,26 @@ class dataLoader(Process):
         self._loadFunc()
 
     """
-    _getLine
+    _getLines
 
-    returns a single row from the open file as a numpy float64 array
+    Each _getLines function reads in a file of a different type and sends data
+    to the GPUCalculator class
     """
-    def _getLine(self, row):
-        if ".asc" in self.file_name:
-            f=self.open_file.readline().split()
-        elif ".tif" in self.file_name:
+
+    def _getLinesASC(self):
+        for line in self.open_file:
+            self.output_pipe.send(np.float64(line.split()))
+
+    def _getLinesTIF(self):
+        count = 0
+        while count < self.totalRows:
             try:
                 f=struct.unpack(self.unpackVal, self.open_raster_band.ReadRaster(0,row,self.totalCols,1, buf_type=self.dataType))
+                self.output_pipe.send(np.float64(f))
             # EOF
             except RuntimeError:
                 f=[]   
-        return np.float64(f)
+            count += 1
 
     """
     _loadFunc
@@ -123,10 +129,10 @@ class dataLoader(Process):
     sends data one row at a time to output_pipe, sends exactly the number of rows as are in the input file
     """
     def _loadFunc(self):
-        count = 0
-        while count < self.totalRows:
-            self.output_pipe.send(self._getLine(count))
-            count += 1
+        if ".asc" in self.file_name:
+            self._getLinesASC()
+        elif ".tif" in self.file_name:
+            self._getLinesTIF()
         self.output_pipe.close()
         print "Input file loaded from disk"
 
