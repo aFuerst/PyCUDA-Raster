@@ -3,6 +3,9 @@ import numpy as np
 from os.path import exists
 from os import remove
 from osgeo import gdal
+import Tkinter as tk
+import ttk
+import threading
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -30,6 +33,7 @@ class dataSaver(Process):
     """
     def __init__(self, _output_file,  header, _input_pipe):
         Process.__init__(self)
+    
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
 
@@ -44,15 +48,33 @@ class dataSaver(Process):
             self.GeoT = header[6]
             self.prj = header[7]
 
+    def __del__(self):
+        pass
+
     """
     run
 
     calls functions needed to write all data to file_name
     """
     def run(self):
+        tkint = threading.Thread(target = self._gui)
+        tkint.start()
         self._openFile()
         self._writeFunc()
         self._closeFile()
+
+    """
+    _gui
+
+    tkinter gui to dispaly write out progress
+    """
+    def _gui(self):
+        self.rt = tk.Tk()
+        self.pb=ttk.Progressbar(mode="determinate", maximum=self.totalRows)
+        self.lb = ttk.Label(text = self.file_name + " progress")
+        self.lb.pack(side="top", fill="x")
+        self.pb.pack(side="bottom", fill="x")
+        self.rt.mainloop()
 
     """
     _closeFile
@@ -134,5 +156,6 @@ class dataSaver(Process):
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
             nrows+=1
+            self.pb.step(1)
         print "Output %s written to disk" % self.file_name
-
+        
