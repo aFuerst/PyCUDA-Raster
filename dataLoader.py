@@ -116,11 +116,12 @@ class dataLoader(Process):
         count = 0
         while count < self.totalRows:
             try:
-                f=struct.unpack(self.unpackVal, self.open_raster_band.ReadRaster(0,row,self.totalCols,1, buf_type=self.dataType))
+                f=struct.unpack(self.unpackVal, self.open_raster_band.ReadRaster(0,count,self.totalCols,1, buf_type=self.dataType))
                 self.output_pipe.send(np.float64(f))
             # EOF
             except RuntimeError:
                 f=[]   
+                return
             count += 1
 
     """
