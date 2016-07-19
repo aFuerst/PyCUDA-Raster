@@ -30,10 +30,9 @@ class dataLoader(Process):
         Process.__init__(self)
         self.output_pipe = _output_pipe
         self.file_name = _input_file
+        self.file_type = None
         self._openFile()
         self._readHeaderInfo()
-        self.cur_line=""
-        self.prev_last_row=""
 
     """
     getHeaderInfo
@@ -43,9 +42,9 @@ class dataLoader(Process):
     (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner, GeoT, prj)
     """
     def getHeaderInfo(self):
-        if ".asc" in self.file_name:
+        if "asc" == self.file_type:
             return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner
-        elif ".tif" in self.file_name:
+        elif "tif" == self.file_type:
             return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj
     """
     _readHeaderInfo
@@ -53,14 +52,14 @@ class dataLoader(Process):
     requires file to be opened already, gets header info from file and puts it in instance variables
     """
     def _readHeaderInfo(self):
-        if ".asc" in self.file_name:
+        if "asc" == self.file_type:
             self.totalCols = np.int64(float(self.open_file.readline().split()[1]))
             self.totalRows = np.int64(float(self.open_file.readline().split()[1]))
             self.xllcorner = np.float64(self.open_file.readline().split()[1])
             self.yllcorner = np.float64(self.open_file.readline().split()[1])
             self.cellsize = np.float64(self.open_file.readline().split()[1])
             self.NODATA = np.float64(self.open_file.readline().split()[1])
-        elif ".tif" in self.file_name:
+        elif "tif" == self.file_type:
             self.GeoT = self.open_file.GetGeoTransform()
             self.prj = self.open_file.GetProjection()
             self.NODATA = self.open_raster_band.GetNoDataValue()
@@ -78,11 +77,24 @@ class dataLoader(Process):
     def _openFile(self):
         if ".asc" in self.file_name:
             self.open_file=open(self.file_name, 'r')
+            self.file_type = "asc"
         elif ".tif" in self.file_name:
             self.open_file = gdal.Open(self.file_name)
             self.open_raster_band = self.open_file.GetRasterBand(1)
             self.dataType = self.open_raster_band.DataType
             self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
+            self.file_type = "tif"
+        else:
+            print "Unsupported file type"
+            self.stop()
+
+    """
+    getFileType
+
+    Returns the extension of the input file type as a string.
+    """
+    def getFileType(self):
+        return self.file_type
 
     """
     stop 
@@ -130,9 +142,9 @@ class dataLoader(Process):
     sends data one row at a time to output_pipe, sends exactly the number of rows as are in the input file
     """
     def _loadFunc(self):
-        if ".asc" in self.file_name:
+        if "asc" == self.file_type:
             self._getLinesASC()
-        elif ".tif" in self.file_name:
+        elif "tif" == self.file_type:
             self._getLinesTIF()
         self.output_pipe.close()
         print "Input file loaded from disk"

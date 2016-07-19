@@ -26,16 +26,19 @@ class dataSaver(Process):
     paramaters:
         output_file - must be a valid file path as a string
         header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
+                 Includes geotiff information if a tif input was used.
+        file_type - a string which represents the file extension for input/output
         input_pipe - a Pipe object to read information from
 
     opens the output file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, _output_file,  header, _input_pipe):
+    def __init__(self, _output_file,  header, _file_type, _input_pipe):
         Process.__init__(self)
     
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
+        self.file_type = _file_type
 
         #unpack header info
         self.totalCols = header[0]
@@ -44,7 +47,7 @@ class dataSaver(Process):
         self.NODATA = header[3]
         self.xllcorner = header[4]
         self.yllcorner = header[5]
-        if ".tif" in self.file_name:
+        if "tif" == self.file_type:
             self.GeoT = header[6]
             self.prj = header[7]
 
@@ -54,7 +57,8 @@ class dataSaver(Process):
     """
     run
 
-    calls functions needed to write all data to file_name
+    calls functions needed to write all data to file_name and render
+    a progress bar
     """
     def run(self):
         tkint = threading.Thread(target = self._gui)
@@ -82,9 +86,9 @@ class dataSaver(Process):
     
     """
     def _closeFile(self):
-        if ".tif" in self.file_name:
+        if "tif" == self.file_type:
             self.dataset.FlushCache()
-        elif ".asc" in self.file_name:
+        elif "asc" == self.file_type:
             self.out_file.close()
 
     """
@@ -106,7 +110,7 @@ class dataSaver(Process):
         if exists(self.file_name):
             print self.file_name, "already exists. Deleting it..."
             remove(self.file_name)
-        if ".asc" in self.file_name:
+        if "asc" == self.file_type:
             try:
                 self.out_file = open(self.file_name, 'w')
             except IOError:
@@ -126,7 +130,7 @@ class dataSaver(Process):
                     "NODATA_value %f\n"
                     % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
                     )
-        elif ".tif" in self.file_name:
+        elif "tif" == self.file_type:
             self.driver = gdal.GetDriverByName('GTiff')
             self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float64)
             self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
@@ -148,10 +152,10 @@ class dataSaver(Process):
             except EOFError:
                 print "Pipe closed unexpectedly"
                 self.stop()
-            if ".asc" in self.file_name: 
+            if "asc" == self.file_type: 
                 arr.tofile(self.out_file, sep=" ", format="%.3f")
                 self.out_file.write('\n')
-            elif ".tif" in self.file_name:
+            elif "tif" == self.file_type:
                 self.dataset.GetRasterBand(1).WriteArray(np.float64([arr]), 0, nrows-1)
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
