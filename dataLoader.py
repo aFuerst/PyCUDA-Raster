@@ -1,6 +1,7 @@
 from osgeo import gdal
+from gdalconst import *
 from multiprocessing import Process, Pipe
-import struct, os
+import struct
 import numpy as np
 
 gdal.UseExceptions()
@@ -42,32 +43,24 @@ class dataLoader(Process):
     (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner, GeoT, prj)
     """
     def getHeaderInfo(self):
-        if "asc" == self.file_type:
-            return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner
-        elif "tif" == self.file_type:
-            return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj
+        return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj
     """
     _readHeaderInfo
 
     requires file to be opened already, gets header info from file and puts it in instance variables
     """
     def _readHeaderInfo(self):
-        if "asc" == self.file_type:
-            self.totalCols = np.int64(float(self.open_file.readline().split()[1]))
-            self.totalRows = np.int64(float(self.open_file.readline().split()[1]))
-            self.xllcorner = np.float64(self.open_file.readline().split()[1])
-            self.yllcorner = np.float64(self.open_file.readline().split()[1])
-            self.cellsize = np.float64(self.open_file.readline().split()[1])
-            self.NODATA = np.float64(self.open_file.readline().split()[1])
-        elif "tif" == self.file_type:
-            self.GeoT = self.open_file.GetGeoTransform()
-            self.prj = self.open_file.GetProjection()
-            self.NODATA = self.open_raster_band.GetNoDataValue()
-            self.xllcorner = self.GeoT[0]
-            self.yllcorner = self.GeoT[3]
+        self.GeoT = self.open_file.GetGeoTransform()
+        self.prj = self.open_file.GetProjection()
+        self.NODATA = self.open_raster_band.GetNoDataValue()
+        self.xllcorner = self.GeoT[0]
+        self.yllcorner = self.GeoT[3]
+        if self.file_type == "tif":
             self.cellsize = self.open_raster_band.GetScale()
-            self.totalRows = self.open_raster_band.YSize
-            self.totalCols = self.open_raster_band.XSize
+        elif self.file_type == "asc":
+            self.cellsize = self.GeoT[1]
+        self.totalRows = self.open_raster_band.YSize
+        self.totalCols = self.open_raster_band.XSize
   
     """
     _openFile
@@ -75,14 +68,13 @@ class dataLoader(Process):
     opens file_name and sets it to open_file, supports '.tif' and '.asc' files
     """
     def _openFile(self):
+        self.open_file = gdal.Open(self.file_name, GA_ReadOnly)
+        self.open_raster_band = self.open_file.GetRasterBand(1)
+        self.dataType = self.open_raster_band.DataType
+        self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
         if ".asc" in self.file_name:
-            self.open_file=open(self.file_name, 'r')
             self.file_type = "asc"
         elif ".tif" in self.file_name:
-            self.open_file = gdal.Open(self.file_name)
-            self.open_raster_band = self.open_file.GetRasterBand(1)
-            self.dataType = self.open_raster_band.DataType
-            self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
             self.file_type = "tif"
         else:
             print "Unsupported file type"
@@ -119,22 +111,18 @@ class dataLoader(Process):
     Each _getLines function reads in a file of a different type and sends data
     to the GPUCalculator class
     """
-
-    def _getLinesASC(self):
-        for line in self.open_file:
-            self.output_pipe.send(np.float64(line.split()))
-
-    def _getLinesTIF(self):
-        count = 0
-        while count < self.totalRows:
+    def _getLines(self):
+        line_num = 0
+        while line_num < self.totalRows:
             try:
-                f=struct.unpack(self.unpackVal, self.open_raster_band.ReadRaster(0,count,self.totalCols,1, buf_type=self.dataType))
+                line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,1,buf_type=self.dataType)
+                f=struct.unpack(self.unpackVal, line_tup)
                 self.output_pipe.send(np.float64(f))
             # EOF
             except RuntimeError:
                 f=[]   
                 return
-            count += 1
+            line_num += 1
 
     """
     _loadFunc
@@ -142,10 +130,7 @@ class dataLoader(Process):
     sends data one row at a time to output_pipe, sends exactly the number of rows as are in the input file
     """
     def _loadFunc(self):
-        if "asc" == self.file_type:
-            self._getLinesASC()
-        elif "tif" == self.file_type:
-            self._getLinesTIF()
+        self._getLines()
         self.output_pipe.close()
         print "Input file loaded from disk"
 

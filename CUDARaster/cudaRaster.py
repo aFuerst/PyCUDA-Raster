@@ -211,7 +211,6 @@ class CUDARaster:
             functions = []
             outputs = []
             input_file = self.dlg.input_line.text()
-            extension = self.dlg.input_line.text()[-4:]
             #TODO: Check if this works on windows
             if name == 'posix':
                 input_file = input_file[input_file.rfind('/'):-4]
@@ -226,5 +225,5 @@ class CUDARaster:
             for function in functions:
                 outputs.append(self.dlg.output_line.text()\
                              + input_file\
-                             + "_" + function + extension) 
+                             + "_" + function + ".tif") 
             scheduler.run(self.dlg.input_line.text(), outputs, functions)

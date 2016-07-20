@@ -27,18 +27,16 @@ class dataSaver(Process):
         output_file - must be a valid file path as a string
         header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
                  Includes geotiff information if a tif input was used.
-        file_type - a string which represents the file extension for input/output
         input_pipe - a Pipe object to read information from
 
     opens the output file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, _output_file,  header, _file_type, _input_pipe):
+    def __init__(self, _output_file,  header, _input_pipe):
         Process.__init__(self)
     
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
-        self.file_type = _file_type
 
         #unpack header info
         self.totalCols = header[0]
@@ -47,9 +45,11 @@ class dataSaver(Process):
         self.NODATA = header[3]
         self.xllcorner = header[4]
         self.yllcorner = header[5]
-        if "tif" == self.file_type:
-            self.GeoT = header[6]
-            self.prj = header[7]
+        self.GeoT = header[6]
+        self.prj = header[7]
+
+        self.guiMade = threading.Event()
+        self.guiMade.clear()
 
     def __del__(self):
         pass
@@ -78,6 +78,7 @@ class dataSaver(Process):
         self.lb = ttk.Label(text = self.file_name + " progress")
         self.lb.pack(side="top", fill="x")
         self.pb.pack(side="bottom", fill="x")
+        self.guiMade.set()
         self.rt.mainloop()
 
     """
@@ -86,10 +87,7 @@ class dataSaver(Process):
     
     """
     def _closeFile(self):
-        if "tif" == self.file_type:
-            self.dataset.FlushCache()
-        elif "asc" == self.file_type:
-            self.out_file.close()
+        self.dataset.FlushCache()
 
     """
     stop
@@ -110,32 +108,11 @@ class dataSaver(Process):
         if exists(self.file_name):
             print self.file_name, "already exists. Deleting it..."
             remove(self.file_name)
-        if "asc" == self.file_type:
-            try:
-                self.out_file = open(self.file_name, 'w')
-            except IOError:
-                print "Cannot open", self.file_name
-                self.stop()
-            except ValueError:
-                print "Output file name was not a string"
-                self.stop()
-
-            # write out header
-            self.out_file.write(
-                    "ncols %.0f\n"
-                    "nrows %.0f\n"
-                    "xllcorner %.2f\n"
-                    "yllcorner %.2f\n"
-                    "cellsize %f\n"
-                    "NODATA_value %f\n"
-                    % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
-                    )
-        elif "tif" == self.file_type:
-            self.driver = gdal.GetDriverByName('GTiff')
-            self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
-            self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
-            self.dataset.SetGeoTransform(self.GeoT)
-            self.dataset.SetProjection(self.prj)
+        self.driver = gdal.GetDriverByName('GTiff')
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float64)
+        self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
+        self.dataset.SetGeoTransform(self.GeoT)
+        self.dataset.SetProjection(self.prj)
 
     """
     _writeFunc
@@ -145,6 +122,7 @@ class dataSaver(Process):
     """
     def _writeFunc(self):
         nrows = 0
+        self.guiMade.wait()
         while nrows < self.totalRows:
             # get line from pipe
             try:
@@ -152,13 +130,9 @@ class dataSaver(Process):
             except EOFError:
                 print "Pipe closed unexpectedly"
                 self.stop()
-            if "asc" == self.file_type: 
-                arr.tofile(self.out_file, sep=" ", format="%.3f")
-                self.out_file.write('\n')
-            elif "tif" == self.file_type:
-                self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows-1)
-                if nrows % 50 == 0:
-                    self.dataset.FlushCache()
+            self.dataset.GetRasterBand(1).WriteArray(np.float64([arr]), 0, nrows-1)
+            if nrows % 50 == 0:
+                self.dataset.FlushCache()
             nrows+=1
             self.pb.step(1)
         print "Output %s written to disk" % self.file_name

@@ -1,4 +1,4 @@
-import gdalLoader, gpuCalc, dataSaver
+import dataLoader, gpuCalc, dataSaver
 import numpy as np
 
 from multiprocessing import Process, Pipe, active_children
@@ -16,12 +16,12 @@ def run(inputFile, outputFiles, functions):
     for i in range(len(outputFiles)):
         outputPipes.append(Pipe())
 
-    loader = gdalLoader.dataLoader(inputFile, inputPipe[0])
+    loader = dataLoader.dataLoader(inputFile, inputPipe[0])
     header = loader.getHeaderInfo()
     calc = gpuCalc.GPUCalculator(header, inputPipe[1], map((lambda x: x[0]), outputPipes), functions)
     savers = []
     for i in range(len(outputFiles)):
-        savers.append(dataSaver.dataSaver(outputFiles[i], header, loader.getFileType(), outputPipes[i][1]))
+        savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1]))
 
     # start all threads
     loader.start()
