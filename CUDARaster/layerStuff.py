@@ -30,6 +30,7 @@ class layerStuff(Process):
         self.log("grabbed layer")
         self.ext = self.layer.extent()
         self.d = self.layer.dataProvider().block(1, self.ext, self.layer.width(), self.layer.height())
+        #self.d = None
         self.log("done init")
         self._readHeaderInfo()
         self.log("returning from init")
@@ -59,19 +60,25 @@ class layerStuff(Process):
         self._loadFunc()
 
     def _getLine(self, row):
-        #self.log("in getline")
-        #for y in range(rlayer.height()):
         arr = []
-        #self.log("fetching row: " + str(row))
         for x in range(self.layer.width()):
             if isnan(self.d.value(row,x)): 
                 self.log("illegal value, breaking, (" + str(x) + ", " + str(row) + ")")
-                break
+                self.stop()
             arr.append( self.d.value(row,x))
         return np.float64(arr)
 
     def getFileType(self):
         return "tif" 
+
+    """
+    stop 
+
+    Alerts the thread that it needs to quit
+    """
+    def stop(self):
+        self.log("Stopping layer stuff...")
+        exit(1)
 
     """
     _loadFunc

@@ -117,7 +117,7 @@
   <widget class="QLabel" name="label_3">
    <property name="geometry">
     <rect>
-     <x>210</x>
+     <x>270</x>
      <y>210</y>
      <width>351</width>
      <height>131</height>
@@ -189,6 +189,45 @@ Only support .asc and .tif files</string>
    </property>
    <property name="text">
     <string>input Layer</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="qgis_slope_check">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>230</y>
+     <width>121</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Load into Qgis</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="qgis_aspect_check">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>260</y>
+     <width>121</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Load into Qgis</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="qgis_hillshade_check">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>300</y>
+     <width>121</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Load into Qgis</string>
    </property>
   </widget>
  </widget>

@@ -97,7 +97,7 @@ class dataSaver(Process):
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping saver ", self.fileName ," ..."
+        print "Stopping saver ", self.file_name ," ..."
         exit(1)
 
     """

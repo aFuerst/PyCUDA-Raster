@@ -126,6 +126,9 @@ class dataLoader(Process):
     def run(self):
         self._loadFunc()
 
+    def getFileType(self):
+        return self.file_type
+
     """
     _getLines
 
