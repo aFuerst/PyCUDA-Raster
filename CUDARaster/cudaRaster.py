@@ -236,7 +236,6 @@ class CUDARaster:
                     input_file_name = "/" + input_file_name
                 else:
                     input_file_name = "\\" + input_file_name
-
             else:
                 input_file = self.dlg.input_line.text()
                 extension = self.dlg.input_line.text()[-4:]
@@ -262,8 +261,7 @@ class CUDARaster:
                 functions.append("hillshade")
             for function in functions:
                 outputs.append(self.dlg.output_line.text()\
-                             + input_file_name\
+                             + input_file\
                              + "_" + function + ".tif") 
-
-            scheduler.run(input_file, outputs, functions)
+            scheduler.run(self.dlg.input_line.text(), outputs, functions)
 
