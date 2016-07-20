@@ -132,7 +132,7 @@ class dataSaver(Process):
                     )
         elif "tif" == self.file_type:
             self.driver = gdal.GetDriverByName('GTiff')
-            self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float64)
+            self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
             self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
             self.dataset.SetGeoTransform(self.GeoT)
             self.dataset.SetProjection(self.prj)
@@ -156,7 +156,7 @@ class dataSaver(Process):
                 arr.tofile(self.out_file, sep=" ", format="%.3f")
                 self.out_file.write('\n')
             elif "tif" == self.file_type:
-                self.dataset.GetRasterBand(1).WriteArray(np.float64([arr]), 0, nrows-1)
+                self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows-1)
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
             nrows+=1
