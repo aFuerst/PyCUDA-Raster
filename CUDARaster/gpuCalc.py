@@ -4,6 +4,7 @@ from gpustruct import GPUStruct
 
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
+import os.path, os
 
 TOTALROWCOUNT = 0
 
@@ -30,15 +31,20 @@ class GPUCalculator(Process):
     """
     def __init__(self, header, _inputPipe, _outputPipes, functionTypes):
         Process.__init__(self)
-
+        print os.path.realpath(__file__)
+        if os.path.exists(os.path.realpath(__file__)[:-len("gpuCalc.py")] + "gpu_calc_log.txt"):
+            os.remove(os.path.realpath(__file__)[:-len("gpuCalc.py")] + "gpu_calc_log.txt")
+        self.logfile = open(os.path.realpath(__file__)[:-len("gpuCalc.py")] + "gpu_calc_log.txt", 'w')
+        #self.log( os.path.realpath(__file__)[:-10] + "gpu_calc_log.txt")
+        self.log("in gpu init")
         # CUDA device info
         self.device = None
         self.context = None
 
         self.inputPipe = _inputPipe
-        self.outputPipes = _outputPipes 
+        self.outputPipes = _outputPipes
         self.functions = functionTypes
-    
+
         #unpack header info
         self.totalCols = header[0]
         self.totalRows = header[1]
@@ -61,6 +67,13 @@ class GPUCalculator(Process):
         self.carry_over_rows[0].fill(self.NODATA)
         self.carry_over_rows[1].fill(self.NODATA)
 
+        self.log("gpu init done")
+
+    def log(self, message):
+        self.logfile.write(str(message) + '\n')
+        print str(message)
+        self.logfile.flush()
+
     """
     run
 
@@ -71,6 +84,7 @@ class GPUCalculator(Process):
     does CUDA initialization and sets local device and context
     """
     def run(self):
+        self.log("in gpu run")
         cuda.init()
         self.device = cuda.Device(0)
         self.context = self.device.make_context()
@@ -83,6 +97,7 @@ class GPUCalculator(Process):
         #Process data while we continue to receive input
         count = 0
         while self.recv_data(count):
+            #self.log(count)
             #Copy input data to GPU
             cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
             for i in range(len(self.functions)):
@@ -92,7 +107,7 @@ class GPUCalculator(Process):
                 self.write_data(count, self.outputPipes[i])
 
             count += (self.maxPossRows-2)  # -2 because of buffer rows
-            print "Page done... %.3f %% completed" % ((float(count) / float(self.totalRows)) * 100)
+            self.log("Page done... %.3f %% completed" % ((float(count) / float(self.totalRows)) * 100))
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):
@@ -103,7 +118,7 @@ class GPUCalculator(Process):
         for pipe in self.outputPipes:
             pipe.close()
 
-        print "GPU calculations finished"
+        self.log("GPU calculations finished")
 
     """
     _gpuAlloc
@@ -117,7 +132,7 @@ class GPUCalculator(Process):
         self.maxPossRows = np.int(np.floor(self.freeMem / (8 * self.totalCols)))
         # set max rows to smaller number to save memory usage
         if self.totalRows < self.maxPossRows:
-            print "reducing max rows to reduce memory use on GPU"
+            self.log("reducing max rows to reduce memory use on GPU")
             self.maxPossRows = self.totalRows
             #self.maxPossRows = 100
 
@@ -219,7 +234,7 @@ class GPUCalculator(Process):
         elif func == "hillshade":
             return 2
         else:
-            print "Illegal function chosen"
+            self.log("Illegal function chosen")
             raise NotImplemented
 
     """
@@ -239,18 +254,20 @@ class GPUCalculator(Process):
             outPipe.send(self.from_gpu_buffer[row])
         """
         for row in range(1, self.maxPossRows-1):
+            #self.log("gpu sending row" + str(count + row))
             if count + row > self.totalRows:
                 break
             outPipe.send(self.from_gpu_buffer[row])
+
     """
     stop 
 
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping gpuCalc..."
-        self.data_gpu.free()
-        self.result_gpu.free()
+        self.log("Stopping gpuCalc...")
+        #self.data_gpu.free()
+        #self.result_gpu.free()
         exit(1)
 
     """

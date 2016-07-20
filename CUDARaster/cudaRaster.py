@@ -21,7 +21,8 @@
  ***************************************************************************/
 """
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
-from PyQt4.QtGui import QAction, QIcon, QFileDialog, QCheckBox
+from PyQt4.QtGui import QAction, QIcon, QFileDialog, QCheckBox, QComboBox
+from qgis.utils import iface
 # Initialize Qt resources from file resources.py
 import resources
 # Import the code for the dialog
@@ -78,6 +79,11 @@ class CUDARaster:
         self.dlg.slope_check.setChecked(False)
         self.dlg.aspect_check.setChecked(False)
         self.dlg.hillshade_check.setChecked(False)
+
+        # supported output types
+        self.output_types = [".tif", ".asc"]
+        self.dlg.output_file_type_box.addItems(self.output_types)
+
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -178,7 +184,6 @@ class CUDARaster:
             callback=self.run,
             parent=self.iface.mainWindow())
 
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
@@ -200,6 +205,14 @@ class CUDARaster:
     def run(self):
         from os import name
         """Run method that performs all the real work"""
+        # get layers currently loaded in qgis
+        self.dlg.input_layer_box.clear()
+        self.layers = self.iface.legendInterface().layers()
+        layer_list = []
+        layer_list.append("None")
+        for layer in self.layers:
+             layer_list.append(layer.name())
+        self.dlg.input_layer_box.addItems(layer_list)
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
@@ -210,13 +223,37 @@ class CUDARaster:
             # substitute with your code.
             functions = []
             outputs = []
-            input_file = self.dlg.input_line.text()
-            extension = self.dlg.input_line.text()[-4:]
-            #TODO: Check if this works on windows
-            if name == 'posix':
-                input_file = input_file[input_file.rfind('/'):-4]
+            selected_index = self.dlg.input_layer_box.currentIndex()
+            print "layer index: ", selected_index
+
+            if selected_index != 0:
+                input_file = self.layers[selected_index-1]
+                input_file_name = input_file.name()
+                extension = self.output_types[self.dlg.output_file_type_box.currentIndex()]
+                print "file name: ", input_file_name
+                if name == 'posix':
+                    #input_file = input_file[input_file.rfind('/')+1:]
+                    input_file_name = "/" + input_file_name
+                else:
+                    input_file_name = "\\" + input_file_name
+
             else:
-                input_file = input_file[input_file.rfind('\\'):-4]
+                input_file = self.dlg.input_line.text()
+                extension = self.dlg.input_line.text()[-4:]
+         
+                #TODO: Check if this works on windows
+                if name == 'posix':
+                    #input_file = input_file[input_file.rfind('/')+1:]
+                    input_file_name = input_file[input_file.rfind('/')+1:]
+                    input_file_name = "/" + input_file_name[:-4]
+                else:
+                    input_file = input_file[input_file.rfind('\\')+1:]
+                    input_file_name = "\\" + input_file_name[:-4]
+
+                print "file name: ", input_file_name
+                print "input file: ", input_file
+
+            print input_file, " in cudaRaster"
             if self.dlg.slope_check.isChecked():
                 functions.append("slope")
             if self.dlg.aspect_check.isChecked():
@@ -225,6 +262,8 @@ class CUDARaster:
                 functions.append("hillshade")
             for function in functions:
                 outputs.append(self.dlg.output_line.text()\
-                             + input_file\
-                             + "_" + function + extension) 
-            scheduler.run(self.dlg.input_line.text(), outputs, functions)
+                             + input_file_name\
+                             + "_" + function + ".tif") 
+
+            scheduler.run(input_file, outputs, functions)
+
