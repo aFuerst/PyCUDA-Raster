@@ -108,36 +108,14 @@ class dataSaver(Process):
         if exists(self.file_name):
             print self.file_name, "already exists. Deleting it..."
             remove(self.file_name)
-<<<<<<< HEAD
-        if "asc" == self.file_type:
-            try:
-                self.out_file = open(self.file_name, 'w')
-            except IOError:
-                print "Cannot open", self.file_name
-                self.stop()
-            except ValueError:
-                print "Output file name was not a string"
-                self.stop()
-
-            # write out header
-            self.out_file.write(
-                    "ncols %.0f\n"
-                    "nrows %.0f\n"
-                    "xllcorner %.2f\n"
-                    "yllcorner %.2f\n"
-                    "cellsize %f\n"
-                    "NODATA_value %f\n"
-                    % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
-                    )
-        elif "tif" == self.file_type:
-            self.driver = gdal.GetDriverByName('GTiff')
-            self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
-            self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
-            self.dataset.SetGeoTransform(self.GeoT)
-            try:
-                self.dataset.SetProjection(str(self.prj))
-            except RuntimeError:
-                self.dataset.SetProjection('')
+        self.driver = gdal.GetDriverByName('GTiff')
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
+        self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
+        self.dataset.SetGeoTransform(self.GeoT)
+        try:
+            self.dataset.SetProjection(str(self.prj))
+        except RuntimeError:
+            self.dataset.SetProjection('')
     """
     _writeFunc
 
