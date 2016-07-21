@@ -276,14 +276,37 @@ class CUDARaster:
                 baseName = fileInfo.baseName()            
                 rlayer = QgsRasterLayer(outputs[0], baseName)
                 QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-            if self.dlg.qgis_aspect_check.isChecked():
-                fileInfo = QFileInfo(outputs[1])
-                baseName = fileInfo.baseName()            
-                rlayer = QgsRasterLayer(outputs[1], baseName)
-                QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-            if self.dlg.qgis_hillshade_check.isChecked():
-                fileInfo = QFileInfo(outputs[2])
-                baseName = fileInfo.baseName()            
-                rlayer = QgsRasterLayer(outputs[2], baseName)
-                QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-
+	    	if self.dlg.qgis_aspect_check.isChecked():
+                    fileInfo = QFileInfo(outputs[1])
+                    baseName = fileInfo.baseName()
+                    rlayer = QgsRasterLayer(outputs[1], baseName)
+                    QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+        	    if self.dlg.qgis_hillshade_check.isChecked():
+	       	        fileInfo = QFileInfo(outputs[2])
+               	        baseName = fileInfo.baseName()
+              	        rlayer = QgsRasterLayer(outputs[2], baseName)
+              	        QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+	      		return	
+		if self.dlg.qgis_hillshade_check.isChecked():
+                    fileInfo = QFileInfo(outputs[1])
+                    baseName = fileInfo.baseName()
+                    rlayer = QgsRasterLayer(outputs[1], baseName)
+                    QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+		    return
+            elif self.dlg.qgis_aspect_check.isChecked():
+                  fileInfo = QFileInfo(outputs[0])
+                  baseName = fileInfo.baseName()            
+                  rlayer = QgsRasterLayer(outputs[0], baseName)
+                  QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+		  if self.dlg.qgis_hillshade_check.isChecked():
+                      fileInfo = QFileInfo(outputs[1])
+                      baseName = fileInfo.baseName()
+                      rlayer = QgsRasterLayer(outputs[1], baseName)
+                      QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+		      return	
+	    elif self.dlg.qgis_hillshade_check.isChecked():
+                  fileInfo = QFileInfo(outputs[0])
+                  baseName = fileInfo.baseName()            
+                  rlayer = QgsRasterLayer(outputs[0], baseName)
+                  QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+		
