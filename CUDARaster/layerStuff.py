@@ -21,7 +21,6 @@ class layerStuff(Process):
         if os.path.exists(os.path.realpath(__file__)[:-len("layerStuff.py")] + "layer_stuff_log.txt"):
             os.remove(os.path.realpath(__file__)[:-len("layerStuff.py")] + "layer_stuff_log.txt")
         self.logfile = open(os.path.realpath(__file__)[:-len("layerStuff.py")] + "layer_stuff_log.txt", 'w')
-        #self.log( os.path.realpath(__file__)[:-14] + "layer_stuff_log.txt")
 
         self.log("init")
         self.output_pipe = output_pipe
@@ -30,7 +29,6 @@ class layerStuff(Process):
         self.log("grabbed layer")
         self.ext = self.layer.extent()
         self.d = self.layer.dataProvider().block(1, self.ext, self.layer.width(), self.layer.height())
-        #self.d = None
         self.log("done init")
         self._readHeaderInfo()
         self.log("returning from init")
@@ -45,7 +43,6 @@ class layerStuff(Process):
         self.log("doing cellsize")
         self.cellsize = self.layer.rasterUnitsPerPixelY()
         self.log("doing NODATA")
-        #rlayer.rasterUnitsPerPixelX() * 
         s = self.layer.metadata()
         loc = s.find("No Data Value</p>\n<p>") + len("No Data Value</p>\n<p>")
         loc2 = s.find("<", loc)
@@ -86,12 +83,11 @@ class layerStuff(Process):
     sends data one row at a time to output_pipe, sends exactly the number of rows as are in the input file
     """
     def _loadFunc(self):
-        count = 0
+        count = self.totalRows
         self.log("in load")
-        while count < self.totalRows:
-            #self.log( "sending line")
+        while count > 0:
             self.output_pipe.send(self._getLine(count))
-            count += 1
+            count -= 1
         self.output_pipe.close()
         self.log( "Input file loaded from disk")
 
@@ -103,22 +99,4 @@ class layerStuff(Process):
         self.logfile.write(str(message) + '\n')
         print str(message)
         self.logfile.flush()
-
-"""
-    #layerpath = "/home/afuerst1/Documents/Lembo-REU-2016/aigrid.tif"
-    fileInfo = QFileInfo(layerpath)
-    baseName = fileInfo.baseName()
-
-    rlayer = QgsRasterLayer(layerpath, baseName)
-    rlayer.width(), rlayer.height()
-
-    ext = rlayer.extent()
-
-    d = rlayer.dataProvider().block(1, ext, rlayer.width(), rlayer.height())
-
-
-        
-        
-    QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-"""
 

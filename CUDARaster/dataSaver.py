@@ -36,9 +36,14 @@ class dataSaver(Process):
     def __init__(self, _output_file,  header, _file_type, _input_pipe):
         Process.__init__(self)
     
+        if os.path.exists(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt"):
+            os.remove(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt")
+        self.logfile = open(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt", 'w')
+
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
         self.file_type = _file_type
+        self.log("done init")
 
         #unpack header info
         self.totalCols = header[0]
@@ -50,6 +55,13 @@ class dataSaver(Process):
         if "tif" == self.file_type:
             self.GeoT = header[6]
             self.prj = header[7]
+        self.log((header))
+        self.saveArr = []
+
+    def log(self, message):
+        self.logfile.write(str(message) + '\n')
+        print str(message)
+        self.logfile.flush()
 
     def __del__(self):
         pass
@@ -87,6 +99,8 @@ class dataSaver(Process):
     """
     def _closeFile(self):
         if "tif" == self.file_type:
+            #print len(self.saveArr), len(self.saveArr[0])
+            #self.dataset.GetRasterBand(1).WriteArray(np.float32(self.saveArr))
             self.dataset.FlushCache()
         elif "asc" == self.file_type:
             self.out_file.close()
@@ -97,7 +111,7 @@ class dataSaver(Process):
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        print "Stopping saver ", self.file_name ," ..."
+        self.log("Stopping saver " + self.file_name  +" ...")
         exit(1)
 
     """
@@ -108,16 +122,16 @@ class dataSaver(Process):
     """
     def _openFile(self):
         if os.path.exists(self.file_name):
-            print self.file_name, "already exists. Deleting it..."
+            self.log(self.file_name + "already exists. Deleting it...")
             os.remove(self.file_name)
         if "asc" == self.file_type:
             try:
                 self.out_file = open(self.file_name, 'w')
             except IOError:
-                print "Cannot open", self.file_name
+                self.log("Cannot open" + self.file_name)
                 self.stop()
             except ValueError:
-                print "Output file name was not a string"
+                self.log("Output file name was not a string")
                 self.stop()
 
             # write out header
@@ -153,16 +167,17 @@ class dataSaver(Process):
             try:
                 arr=self.input_pipe.recv()
             except EOFError:
-                print "Pipe closed unexpectedly"
+                self.log("Pipe closed unexpectedly")
                 self.stop()
             if "asc" == self.file_type: 
                 arr.tofile(self.out_file, sep=" ", format="%.3f")
                 self.out_file.write('\n')
             elif "tif" == self.file_type:
+                #self.saveArr.append(arr)
                 self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows-1)
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
             nrows+=1
             self.pb.step(1)
-        print "Output %s written to disk" % self.file_name
+        self.log( "Output %s written to disk" % self.file_name)
 
