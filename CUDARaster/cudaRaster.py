@@ -244,6 +244,9 @@ class CUDARaster:
             else:
                 input_file = self.dlg.input_line.text()
                 extension = self.dlg.input_line.text()[-4:]
+                if input_file == "":
+                    print "NO OPTION SELECTED!"
+                    return
          
                 #TODO: Check if this works on windows
                 if name == 'posix':
@@ -271,42 +274,25 @@ class CUDARaster:
 
             scheduler.run(input_file, outputs, functions)
 
-            if self.dlg.qgis_slope_check.isChecked():
-                fileInfo = QFileInfo(outputs[0])
-                baseName = fileInfo.baseName()            
-                rlayer = QgsRasterLayer(outputs[0], baseName)
-                QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-	    	if self.dlg.qgis_aspect_check.isChecked():
-                    fileInfo = QFileInfo(outputs[1])
-                    baseName = fileInfo.baseName()
-                    rlayer = QgsRasterLayer(outputs[1], baseName)
-                    QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-        	    if self.dlg.qgis_hillshade_check.isChecked():
-	       	        fileInfo = QFileInfo(outputs[2])
-               	        baseName = fileInfo.baseName()
-              	        rlayer = QgsRasterLayer(outputs[2], baseName)
-              	        QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-	      		return	
-		if self.dlg.qgis_hillshade_check.isChecked():
-                    fileInfo = QFileInfo(outputs[1])
-                    baseName = fileInfo.baseName()
-                    rlayer = QgsRasterLayer(outputs[1], baseName)
-                    QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-		    return
-            elif self.dlg.qgis_aspect_check.isChecked():
-                  fileInfo = QFileInfo(outputs[0])
-                  baseName = fileInfo.baseName()            
-                  rlayer = QgsRasterLayer(outputs[0], baseName)
-                  QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-		  if self.dlg.qgis_hillshade_check.isChecked():
-                      fileInfo = QFileInfo(outputs[1])
-                      baseName = fileInfo.baseName()
-                      rlayer = QgsRasterLayer(outputs[1], baseName)
-                      QgsMapLayerRegistry.instance().addMapLayer(rlayer)
-		      return	
-	    elif self.dlg.qgis_hillshade_check.isChecked():
-                  fileInfo = QFileInfo(outputs[0])
-                  baseName = fileInfo.baseName()            
-                  rlayer = QgsRasterLayer(outputs[0], baseName)
-                  QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+            if self.dlg.slope_check.isChecked() and self.dlg.qgis_slope_check.isChecked():
+                for string in outputs:
+                    if "_slope" in string:
+                        fileInfo = QFileInfo(string)
+                        baseName = fileInfo.baseName()            
+                        rlayer = QgsRasterLayer(string, baseName)
+                        QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+            if self.dlg.aspect_check.isChecked() and self.dlg.qgis_aspect_check.isChecked():
+                for string in outputs:
+                    if "_aspect" in string:
+                        fileInfo = QFileInfo(string)
+                        baseName = fileInfo.baseName()            
+                        rlayer = QgsRasterLayer(string, baseName)
+                        QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+            if self.dlg.hillshade_check.isChecked() and self.dlg.qgis_hillshade_check.isChecked():
+                for string in outputs:
+                    if "_hillshade" in string:
+                        fileInfo = QFileInfo(string)
+                        baseName = fileInfo.baseName()            
+                        rlayer = QgsRasterLayer(string, baseName)
+                        QgsMapLayerRegistry.instance().addMapLayer(rlayer)
 		

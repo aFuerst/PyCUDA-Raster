@@ -132,13 +132,9 @@ class dataSaver(Process):
             except EOFError:
                 print "Pipe closed unexpectedly"
                 self.stop()
-            if "asc" == self.file_type: 
-                arr.tofile(self.out_file, sep=" ", format="%.3f")
-                self.out_file.write('\n')
-            elif "tif" == self.file_type:
-                self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows-1)
-                if nrows % 50 == 0:
-                    self.dataset.FlushCache()
+            self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows-1)
+            if nrows % 50 == 0:
+                self.dataset.FlushCache()
             nrows+=1
             self.pb.step(1)
         print "Output %s written to disk" % self.file_name
