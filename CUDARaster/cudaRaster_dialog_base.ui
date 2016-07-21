@@ -117,9 +117,9 @@
   <widget class="QLabel" name="label_3">
    <property name="geometry">
     <rect>
-     <x>270</x>
+     <x>280</x>
      <y>210</y>
-     <width>351</width>
+     <width>331</width>
      <height>131</height>
     </rect>
    </property>
@@ -163,7 +163,7 @@ Only support .asc and .tif files</string>
     <rect>
      <x>170</x>
      <y>30</y>
-     <width>311</width>
+     <width>321</width>
      <height>22</height>
     </rect>
    </property>
@@ -195,9 +195,9 @@ Only support .asc and .tif files</string>
    <property name="geometry">
     <rect>
      <x>150</x>
-     <y>230</y>
+     <y>220</y>
      <width>121</width>
-     <height>21</height>
+     <height>31</height>
     </rect>
    </property>
    <property name="text">
@@ -210,7 +210,7 @@ Only support .asc and .tif files</string>
      <x>150</x>
      <y>260</y>
      <width>121</width>
-     <height>21</height>
+     <height>31</height>
     </rect>
    </property>
    <property name="text">
@@ -223,7 +223,7 @@ Only support .asc and .tif files</string>
      <x>150</x>
      <y>300</y>
      <width>121</width>
-     <height>21</height>
+     <height>31</height>
     </rect>
    </property>
    <property name="text">
