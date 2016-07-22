@@ -5,7 +5,6 @@ import os
 from osgeo import gdal
 import Tkinter as tk
 import ttk
-import threading
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -33,7 +32,7 @@ class dataSaver(Process):
     opens the output file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, _output_file,  header, _file_type, _input_pipe):
+    def __init__(self, _output_file,  header, _input_pipe):
         Process.__init__(self)
     
         if os.path.exists(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt"):
@@ -42,7 +41,6 @@ class dataSaver(Process):
 
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
-        self.file_type = _file_type
         self.log("done init")
 
         #unpack header info
@@ -52,12 +50,9 @@ class dataSaver(Process):
         self.NODATA = header[3]
         self.xllcorner = header[4]
         self.yllcorner = header[5]
-        if "tif" == self.file_type:
-            self.GeoT = header[6]
-            self.prj = header[7]
+        self.GeoT = header[6]
+        self.prj = header[7]
         self.log((header))
-        self.guiMade = threading.Event()
-        self.guiMade.clear()
 
     def log(self, message):
         self.logfile.write(str(message) + '\n')
@@ -74,8 +69,6 @@ class dataSaver(Process):
     a progress bar
     """
     def run(self):
-        #tkint = threading.Thread(target = self._gui)
-        #tkint.start()
         self._openFile()
         self._gui()
         self._writeFunc()
@@ -92,8 +85,6 @@ class dataSaver(Process):
         self.lb = ttk.Label(text = self.file_name + " progress")
         self.lb.pack(side="top", fill="x")
         self.pb.pack(side="bottom", fill="x")
-        self.guiMade.set()
-        #self.rt.mainloop()
 
     """
     _closeFile
@@ -101,12 +92,8 @@ class dataSaver(Process):
     
     """
     def _closeFile(self):
-        if "tif" == self.file_type:
-            #print len(self.saveArr), len(self.saveArr[0])
-            #self.dataset.GetRasterBand(1).WriteArray(np.float32(self.saveArr))
-            self.dataset.FlushCache()
-        elif "asc" == self.file_type:
-            self.out_file.close()
+        self.dataset.FlushCache()
+
 
     """
     stop
@@ -124,38 +111,17 @@ class dataSaver(Process):
     stores open file object in instance variable 
     """
     def _openFile(self):
-        if os.path.exists(self.file_name):
-            self.log(self.file_name + "already exists. Deleting it...")
-            os.remove(self.file_name)
-        if "asc" == self.file_type:
-            try:
-                self.out_file = open(self.file_name, 'w')
-            except IOError:
-                self.log("Cannot open" + self.file_name)
-                self.stop()
-            except ValueError:
-                self.log("Output file name was not a string")
-                self.stop()
-
-            # write out header
-            self.out_file.write(
-                    "ncols %.0f\n"
-                    "nrows %.0f\n"
-                    "xllcorner %.2f\n"
-                    "yllcorner %.2f\n"
-                    "cellsize %f\n"
-                    "NODATA_value %f\n"
-                    % (self.totalCols, self.totalRows, self.xllcorner, self.yllcorner, self.cellsize, self.NODATA)
-                    )
-        elif "tif" == self.file_type:
-            self.driver = gdal.GetDriverByName('GTiff')
-            self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
-            self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
-            self.dataset.SetGeoTransform(self.GeoT)
-            try:
-                self.dataset.SetProjection(str(self.prj))
-            except RuntimeError:
-                self.dataset.SetProjection('')
+        if exists(self.file_name):
+            self.log(self.file_name + " already exists. Deleting it...")
+            remove(self.file_name)
+        self.driver = gdal.GetDriverByName('GTiff')
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
+        self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
+        self.dataset.SetGeoTransform(self.GeoT)
+        try:
+            self.dataset.SetProjection(str(self.prj))
+        except RuntimeError:
+            self.dataset.SetProjection('')
 
     """
     _writeFunc
@@ -173,14 +139,9 @@ class dataSaver(Process):
             except EOFError:
                 self.log("Pipe closed unexpectedly")
                 self.stop()
-            if "asc" == self.file_type: 
-                arr.tofile(self.out_file, sep=" ", format="%.3f")
-                self.out_file.write('\n')
-            elif "tif" == self.file_type:
-                #self.saveArr.append(arr)
-                self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows)
-                if nrows % 50 == 0:
-                    self.dataset.FlushCache()
+            self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows)
+            if nrows % 50 == 0:
+                self.dataset.FlushCache()
             nrows+=1
             self.pb.step(1)
             self.rt.update()

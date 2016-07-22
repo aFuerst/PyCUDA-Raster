@@ -5,7 +5,6 @@ from os import remove
 from osgeo import gdal
 import Tkinter as tk
 import ttk
-import threading
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -48,9 +47,6 @@ class dataSaver(Process):
         self.GeoT = header[6]
         self.prj = header[7]
 
-        self.guiMade = threading.Event()
-        self.guiMade.clear()
-
     def __del__(self):
         pass
 
@@ -61,9 +57,8 @@ class dataSaver(Process):
     a progress bar
     """
     def run(self):
-        tkint = threading.Thread(target = self._gui)
-        tkint.start()
         self._openFile()
+        self._gui()
         self._writeFunc()
         self._closeFile()
 
@@ -78,8 +73,6 @@ class dataSaver(Process):
         self.lb = ttk.Label(text = self.file_name + " progress")
         self.lb.pack(side="top", fill="x")
         self.pb.pack(side="bottom", fill="x")
-        self.guiMade.set()
-        self.rt.mainloop()
 
     """
     _closeFile
@@ -124,7 +117,6 @@ class dataSaver(Process):
     """
     def _writeFunc(self):
         nrows = 0
-        self.guiMade.wait()
         while nrows < self.totalRows:
             # get line from pipe
             try:
@@ -137,5 +129,6 @@ class dataSaver(Process):
                 self.dataset.FlushCache()
             nrows+=1
             self.pb.step(1)
+            self.rt.update()
         print "Output %s written to disk" % self.file_name
         

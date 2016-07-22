@@ -44,6 +44,7 @@ class dataLoader(Process):
     """
     def getHeaderInfo(self):
         return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj
+
     """
     _readHeaderInfo
 
