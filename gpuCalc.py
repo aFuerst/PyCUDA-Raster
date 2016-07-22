@@ -61,6 +61,9 @@ class GPUCalculator(Process):
         self.carry_over_rows[0].fill(self.NODATA)
         self.carry_over_rows[1].fill(self.NODATA)
 
+    def __del__(self):
+        pass
+        
     """
     run
 
@@ -104,6 +107,10 @@ class GPUCalculator(Process):
             pipe.close()
 
         print "GPU calculations finished"
+        # clean up on GPU
+        self.data_gpu.free()
+        self.result_gpu.free()
+        cuda.Context.pop()
 
     """
     _gpuAlloc
@@ -242,8 +249,6 @@ class GPUCalculator(Process):
     """
     def stop(self):
         print "Stopping gpuCalc..."
-        self.data_gpu.free()
-        self.result_gpu.free()
         exit(1)
 
     """
@@ -260,7 +265,9 @@ class GPUCalculator(Process):
         mod = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>
-
+                    #ifndef M_PI
+                    #define M_PI 3.14159625
+                    #endif
                     typedef struct{
                             double pixels_per_thread;
                             double NODATA;

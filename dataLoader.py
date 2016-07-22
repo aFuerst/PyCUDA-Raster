@@ -34,6 +34,11 @@ class dataLoader(Process):
         self.file_type = None
         self._openFile()
         self._readHeaderInfo()
+        self._closeFile()
+        
+    def _closeFile(self):
+        self.open_file = None
+        self.open_raster_band = None
 
     """
     getHeaderInfo
@@ -104,6 +109,7 @@ class dataLoader(Process):
     calls functions needed to read all data from file_name
     """
     def run(self):
+        self._openFile()
         self._loadFunc()
 
     """
