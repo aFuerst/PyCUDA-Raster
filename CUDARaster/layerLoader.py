@@ -83,9 +83,10 @@ class layerStuff(Process):
     sends data one row at a time to output_pipe, sends exactly the number of rows as are in the input file
     """
     def _loadFunc(self):
-        count = self.totalRows
+        # must go from totalRows to 0 because QGIS is giving us te data backwards because it is stupid.
+        count = self.totalRows - 1
         self.log("in load")
-        while count > 0:
+        while count >= 0:
             self.output_pipe.send(self._getLine(count))
             count -= 1
         self.output_pipe.close()

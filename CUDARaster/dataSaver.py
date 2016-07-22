@@ -56,7 +56,8 @@ class dataSaver(Process):
             self.GeoT = header[6]
             self.prj = header[7]
         self.log((header))
-        self.saveArr = []
+        self.guiMade = threading.Event()
+        self.guiMade.clear()
 
     def log(self, message):
         self.logfile.write(str(message) + '\n')
@@ -73,9 +74,10 @@ class dataSaver(Process):
     a progress bar
     """
     def run(self):
-        tkint = threading.Thread(target = self._gui)
-        tkint.start()
+        #tkint = threading.Thread(target = self._gui)
+        #tkint.start()
         self._openFile()
+        self._gui()
         self._writeFunc()
         self._closeFile()
 
@@ -90,7 +92,8 @@ class dataSaver(Process):
         self.lb = ttk.Label(text = self.file_name + " progress")
         self.lb.pack(side="top", fill="x")
         self.pb.pack(side="bottom", fill="x")
-        self.rt.mainloop()
+        self.guiMade.set()
+        #self.rt.mainloop()
 
     """
     _closeFile
@@ -162,6 +165,7 @@ class dataSaver(Process):
     """
     def _writeFunc(self):
         nrows = 0
+        self.guiMade.wait()
         while nrows < self.totalRows:
             # get line from pipe
             try:
@@ -174,10 +178,11 @@ class dataSaver(Process):
                 self.out_file.write('\n')
             elif "tif" == self.file_type:
                 #self.saveArr.append(arr)
-                self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows-1)
+                self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows)
                 if nrows % 50 == 0:
                     self.dataset.FlushCache()
             nrows+=1
             self.pb.step(1)
+            self.rt.update()
         self.log( "Output %s written to disk" % self.file_name)
 

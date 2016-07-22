@@ -132,7 +132,7 @@ class dataSaver(Process):
             except EOFError:
                 print "Pipe closed unexpectedly"
                 self.stop()
-            self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows-1)
+            self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows)
             if nrows % 50 == 0:
                 self.dataset.FlushCache()
             nrows+=1

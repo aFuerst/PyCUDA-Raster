@@ -7,7 +7,7 @@ import os.path, os
 
 try:
     # allows to run without qgis
-    import qgis, layerStuff
+    import qgis, layerLoader
     from qgis.core import *
 except ImportError:
     pass
@@ -45,7 +45,7 @@ def run(inputFile, outputFiles, functions):
             print "loading from qgis"
             logfile.write("loading from qgis\n")
             logfile.flush()
-            loader = layerStuff.layerStuff(inputFile, inputPipe[0])
+            loader = layerLoader.layerLoader(inputFile, inputPipe[0])
 
         logfile.write("made loader\n")    
         logfile.flush()
