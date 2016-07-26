@@ -78,7 +78,7 @@ def run(inputFile, outputFiles, functions):
 
         savers = []
         for i in range(len(outputFiles)):
-            savers.append(dataSaver.dataSaver(outputFiles[i], header, loader.getFileType(), outputPipes[i][1]))
+            savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1]))
 
         logfile.write("made saver threads\n")
         logfile.flush()
