@@ -99,7 +99,7 @@ class dataLoader(Process):
     """
     def _openFile(self):
         self.log("opening read file")
-        self.open_file = gdal.Open(self.file_name, GA_ReadOnly)
+        self.open_file = gdal.Open(self.file_name, gdal.GA_ReadOnly)
         self.open_raster_band = self.open_file.GetRasterBand(1)
         self.dataType = self.open_raster_band.DataType
         self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
