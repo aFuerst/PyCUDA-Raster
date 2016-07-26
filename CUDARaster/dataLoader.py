@@ -99,7 +99,7 @@ class dataLoader(Process):
     """
     def _openFile(self):
         self.log("opening read file")
-        self.open_file = gdal.Open(self.file_name, GA_ReadOnly)
+        self.open_file = gdal.Open(self.file_name, gdal.GA_ReadOnly)
         self.open_raster_band = self.open_file.GetRasterBand(1)
         self.dataType = self.open_raster_band.DataType
         self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
@@ -139,17 +139,28 @@ class dataLoader(Process):
     to the GPUCalculator class
     """
     def _getLines(self):
+        read_rows = 50
         line_num = 0
-        while line_num < self.totalRows:
-            try:
-                line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,1,buf_type=self.dataType)
-                f=struct.unpack(self.unpackVal, line_tup)
-                self.output_pipe.send(np.float64(f))
-            # EOF
-            except RuntimeError:
-                f=[]   
+        while line_num <= self.totalRows:
+            if line_num == self.totalRows:
                 return
-            line_num += 1
+            try:
+                if line_num + read_rows >= self.totalRows - 1:
+                    remaining = self.totalRows - line_num
+                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,remaining,buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal*remaining, line_tup)
+                    for line in range(remaining):
+                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
+                else:
+                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,read_rows,buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal*read_rows, line_tup)
+                    for line in range(read_rows):
+                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
+            # EOF
+            except RuntimeError as e:
+                print e
+                return
+            line_num += read_rows
 
     """
     _loadFunc

@@ -130,26 +130,28 @@ class dataLoader(Process):
     to the GPUCalculator class
     """
     def _getLines(self):
+        read_rows = 50
         line_num = 0
         while line_num <= self.totalRows:
+            if line_num == self.totalRows:
+                return
             try:
-                if line_num == self.totalRows:
-                    return
-                if line_num == self.totalRows - 1:
-                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,1,buf_type=self.dataType)
-                    f=struct.unpack(self.unpackVal, line_tup)
-                    self.output_pipe.send(np.float64(f))
+                if line_num + read_rows >= self.totalRows - 1:
+                    remaining = self.totalRows - line_num
+                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,remaining,buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal*remaining, line_tup)
+                    for line in range(remaining):
+                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
                 else:
-                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,2,buf_type=self.dataType)
-                    f=struct.unpack(self.unpackVal + self.unpackVal, line_tup)
-                    self.output_pipe.send(np.float64(f[:self.totalCols]))
-                    self.output_pipe.send(np.float64(f[self.totalCols:]))
+                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,read_rows,buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal*read_rows, line_tup)
+                    for line in range(read_rows):
+                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
             # EOF
             except RuntimeError as e:
-                f=[]
                 print e
                 return
-            line_num += 2
+            line_num += read_rows
 
     """
     _loadFunc
