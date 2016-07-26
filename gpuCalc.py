@@ -74,6 +74,8 @@ class GPUCalculator(Process):
 
     def __del__(self):
         pass
+
+    #--------------------------------------------------------------------------#
         
     """
     run
@@ -90,9 +92,6 @@ class GPUCalculator(Process):
         self.context = self.device.make_context()
 
         self._gpuAlloc()
-
-        self.kernel = self._getKernel()
-        self.func = self.kernel.get_function("raster_function")
 
         #Process data while we continue to receive input
         count = 0
@@ -123,6 +122,8 @@ class GPUCalculator(Process):
         self.result_gpu.free()
         cuda.Context.pop()
 
+    #--------------------------------------------------------------------------#
+
     """
     _gpuAlloc
 
@@ -144,6 +145,8 @@ class GPUCalculator(Process):
         self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
         self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
         self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
+
+    #--------------------------------------------------------------------------#
 
     """
     _recvData
@@ -195,6 +198,8 @@ class GPUCalculator(Process):
 
         return True
 
+    #--------------------------------------------------------------------------#
+
 
     """
     _processData
@@ -203,6 +208,9 @@ class GPUCalculator(Process):
     and runs the kernel.
     """
     def _processData(self, funcType):
+        self.kernel = self._getKernel(funcType)
+        self.func = self.kernel.get_function("raster_function")
+
         #GPU layout information
         grid = (16,16)
         block = (32,32,1)
@@ -217,8 +225,7 @@ class GPUCalculator(Process):
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
-            (np.float64, 'cellSize', self.cellsize),
-            (np.int32, 'function', self._getFunctionVal(funcType))
+            (np.float64, 'cellSize', self.cellsize)
             ])
 
         stc.copy_to_gpu()
@@ -226,22 +233,7 @@ class GPUCalculator(Process):
         #Call GPU kernel
         self.func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
 
-    """
-    _getFunctionVal
-
-    returns the case needed for a particular function to run the proper CUDA
-    code
-    """
-    def _getFunctionVal(self, func):
-        if func == "slope":
-            return 0        
-        elif func == "aspect":
-            return 1
-        elif func == "hillshade":
-            return 2
-        else:
-            print "Illegal function chosen"
-            raise NotImplemented
+    #--------------------------------------------------------------------------#
 
     """
     _writeData
@@ -253,6 +245,9 @@ class GPUCalculator(Process):
             if count + row > self.totalRows:
                 break
             out_pipe.send(self.from_gpu_buffer[row])
+
+    #--------------------------------------------------------------------------#
+
     """
     stop 
 
@@ -262,17 +257,147 @@ class GPUCalculator(Process):
         print "Stopping gpuCalc..."
         exit(1)
 
+    #--------------------------------------------------------------------------#
+
+    """
+    _getRasterFunc
+
+    Given a string representing the raster function to calculate,
+    returns the required code to append to the CUDA kernel.
+    """
+    # NOTE: The kernel code in _getKernel only supports functions that are based
+    # on a 3x3 grid of neighbors.
+    #
+    # To add your own computation, add an if statement looking for it, and return
+    # a tuple containg the C code for your function surrounded by triple quotes,
+    # and how that function should be called within the code in _getKernel.
+    # 
+    # Possible parameters you can use from _getKernel:
+    # dz_dx
+    # dz_dy
+    # file_info->pixels_per_thread
+    # file_info->NODATA
+    # file_info->ncols
+    # file_info->nrows
+    # file_info->npixels
+    # file_info->cellSize
+
+    def _getRasterFunc(self, func):
+        if func == "slope":
+            return (\
+                """
+                /*
+                    GPU only function that calculates slope for a pixel
+                */
+                __device__ double slope(double dz_dx, double dz_dy){
+                    return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
+                }
+                """,\
+                """
+                slope(dz_dx, dz_dy)
+                """)
+
+        elif func == "aspect":
+            return (\
+                """
+                /*
+                    GPU only function that calculates aspect for a pixel
+                */
+                __device__ double aspect(double dz_dx, double dz_dy, double NODATA){
+                    double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
+                    if(dz_dx == NODATA || dz_dy == NODATA || (dz_dx == 0.0 && dz_dy == 0.0)){
+                        return NODATA;
+                    } else{
+                        if(aspect > 90.0){
+                            aspect = 360.0 - aspect + 90.0;
+                        } else {
+                            aspect = 90.0 - aspect;
+                        }
+                            aspect = aspect * (M_PI / 180.0);
+                            return aspect;
+                        }
+                }
+                """,\
+                """
+                aspect(dz_dx, dz_dy, file_info->NODATA)
+                """)
+
+        elif func == "hillshade":
+            return (self._getRasterFunc('slope')[0] + \
+                """
+                /*
+                    GPU only function that calculates aspect for a pixel
+                    to be ONLY used by hillshade
+                */    
+                __device__ double hillshade_aspect(double dz_dx, double dz_dy){
+                    double aspect;
+                            if(dz_dx != 0){
+                                aspect = atan2(dz_dy, -(dz_dx));
+                                if(aspect < 0){
+                                    aspect = ((2 * M_PI) + aspect);
+                            }
+                        } else if(dz_dx == 0){
+                            if(dz_dy > 0){
+                                    aspect = (M_PI / 2);
+                                }else if(dz_dy < 0){
+                                    aspect = ((2 * M_PI) - (M_PI / 2));
+                                }else{
+                                    aspect = atan2(dz_dy, -(dz_dx));
+                            }
+                        }
+                    return aspect;
+                }
+
+                /*
+                    GPU only function that calculates hillshade for a pixel
+                */
+                __device__ double hillshade(double dz_dx, double dz_dy){
+                    /* calc slope and aspect */
+                    double slp = slope(dz_dx, dz_dy);
+                    double asp = hillshade_aspect(dz_dx, dz_dy);
+
+                    /* calc zenith */
+                        double altitude = 45;
+                        double zenith_deg = 90 - altitude;
+                        double zenith_rad = zenith_deg * (M_PI / 180.0);
+    
+                    /* calc azimuth */
+                        double azimuth = 315;
+                        double azimuth_math = (360 - azimuth + 90);
+                        if(azimuth_math >= 360.0){
+                                azimuth_math = azimuth_math - 360;
+                    }	
+                    double azimuth_rad = (azimuth_math * M_PI / 180.0);
+
+                    double hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
+
+                        if(hs < 0){
+                                return 0;
+                    } else {
+                        return hs;
+                    }
+                }
+                """,\
+                """
+                hillshade(dz_dx, dz_dy)
+                """)
+
+    #--------------------------------------------------------------------------#
+
     """
     _getKernel
 
-    Packages the kernel module.
+    Packages the kernel module. This kernel assumes that the raster calculations
+    will be based on the dx_dz and dy_dz values, which are calculated from a 3x3
+    grid surrounding the current pixel.
     """
-    # NOTE: To create another raster function, add another if statement to
-    # _getFunctionVal checking for the string you will identify the kernel by,
-    # another case to raster_function in getKernal, and the function code.
+    # NOTE: To create another raster function, you must create an additional
+    # entry in _getRasterCalc. Currently only supports calculations based on a
+    # 3x3 grid surrounding a pixel.
     # The GPUCalculator class is set up to automatically insert buffer rows at
     # the beginning and end of the file so that all rows are calculated correctly.
-    def _getKernel(self):
+    def _getKernel(self, funcType):
+        func_def, func_call = self._getRasterFunc(funcType)
         mod = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>
@@ -286,7 +411,6 @@ class GPUCalculator(Process):
                             unsigned long long nrows;
                             unsigned long long npixels;
                             double cellSize;
-                            int function;
                     } passed_in;
 
                     /************************************************************************************************
@@ -317,85 +441,9 @@ class GPUCalculator(Process):
                             /* return a value otherwise it throws a warning expression not having effect */
                             return 0;
                     }
-
-                    /*
-                        GPU only function that calculates slope for a pixel
-                    */
-                    __device__ double slope(double dz_dx, double dz_dy){
-                        return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
-                    }
-
-                    /*
-                        GPU only function that calculates aspect for a pixel
-                    */
-                    __device__ double aspect(double dz_dx, double dz_dy, double NODATA){
-                        double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
-                        if(dz_dx == NODATA || dz_dy == NODATA || (dz_dx == 0.0 && dz_dy == 0.0)){
-                            return NODATA;
-                        } else{
-                            if(aspect > 90.0){
-                                aspect = 360.0 - aspect + 90.0;
-                            } else {
-                                aspect = 90.0 - aspect;
-                            }
-                                aspect = aspect * (M_PI / 180.0);
-                                return aspect;
-                            }
-                        }
-
-                    /*
-                        GPU only function that calculates aspect for a pixel
-                        to be ONLY used by hillshade
-                    */    
-                    __device__ double hillshade_aspect(double dz_dx, double dz_dy){
-                        double aspect;
-                        	if(dz_dx != 0){
-                        	    aspect = atan2(dz_dy, -(dz_dx));
-                        	    if(aspect < 0){
-                        	        aspect = ((2 * M_PI) + aspect);
-                                }
-                            } else if(dz_dx == 0){
-                            	if(dz_dy > 0){
-                        	        aspect = (M_PI / 2);
-                        	    }else if(dz_dy < 0){
-                        	        aspect = ((2 * M_PI) - (M_PI / 2));
-                        	    }else{
-                        	        aspect = atan2(dz_dy, -(dz_dx));
-                                }
-                            }
-                        return aspect;
-                    }
-
-                    /*
-                        GPU only function that calculates hillshade for a pixel
-                    */
-                    __device__ double hillshade(double dz_dx, double dz_dy){
-                        /* calc slope and aspect */
-                        double slp = slope(dz_dx, dz_dy);
-                        double asp = hillshade_aspect(dz_dx, dz_dy);
-
-                        /* calc zenith */
-	                    double altitude = 45;
-	                    double zenith_deg = 90 - altitude;
-	                    double zenith_rad = zenith_deg * (M_PI / 180.0);
-	
-                        /* calc azimuth */
-	                    double azimuth = 315;
-	                    double azimuth_math = (360 - azimuth + 90);
-	                    if(azimuth_math >= 360.0){
-		                    azimuth_math = azimuth_math - 360;
-                        }	
-                        double azimuth_rad = (azimuth_math * M_PI / 180.0);
-
-                        double hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
-
-	                    if(hs < 0){
-		                    return 0;
-                        } else {
-                            return hs;
-                        }
-                    }
-
+                    """\
+                            + func_def + \
+                    """
                     /************************************************************************************************
                             CUDA Kernel function to calculate the slope of pixels in 'data' and stores them in 'result'
                             handles a variable number of calculations based on its thread/block location 
@@ -428,18 +476,8 @@ class GPUCalculator(Process):
                                             }
                                             double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8 * file_info -> cellSize);
                                             double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8 * file_info -> cellSize);
-                                            /* choose which function to execute */
-                                            switch(file_info -> function){
-                                                case 0:
-                                                    result[offset] = slope(dz_dx, dz_dy);
-                                                break;
-                                                case 1:
-                                                    result[offset] = aspect(dz_dx, dz_dy, file_info -> NODATA);
-                                                break;
-                                                case 2:
-                                                    result[offset] = hillshade(dz_dx, dz_dy);
-                                                break;                        
-                                            }
+
+                                            result[offset] =""" + func_call + """;
                                         }
                                     }
                                     offset += (gridDim.x*blockDim.x) * (gridDim.y*blockDim.y);
@@ -448,4 +486,3 @@ class GPUCalculator(Process):
                     }
                     """)
         return mod
-
