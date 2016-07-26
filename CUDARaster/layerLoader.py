@@ -13,14 +13,31 @@ from multiprocessing import Process, Pipe
 import struct, os, os.path
 from time import time
 
-class layerStuff(Process):
+"""
+layerLoader
+Loader which takes information from an active QGIS layer
+
+copyright            : (C) 2016 by Alex Feurst, Charles Kazer, William Hoffman
+email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gulls.salisbury.edu
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ ***************************************************************************/
+ """
+
+class layerLoader(Process):
 
     def __init__(self, inputLayer, output_pipe):
         Process.__init__(self)
 
-        if os.path.exists(os.path.realpath(__file__)[:-len("layerStuff.py")] + "layer_stuff_log.txt"):
-            os.remove(os.path.realpath(__file__)[:-len("layerStuff.py")] + "layer_stuff_log.txt")
-        self.logfile = open(os.path.realpath(__file__)[:-len("layerStuff.py")] + "layer_stuff_log.txt", 'w')
+        if os.path.exists(os.path.realpath(__file__)[:-len("layerLoader.py")] + "layer_stuff_log.txt"):
+            os.remove(os.path.realpath(__file__)[:-len("layerLoader.py")] + "layer_stuff_log.txt")
+        self.logfile = open(os.path.realpath(__file__)[:-len("layerLoader.py")] + "layer_stuff_log.txt", 'w')
 
         self.log("init")
         self.output_pipe = output_pipe
@@ -50,7 +67,7 @@ class layerStuff(Process):
         self.prj = self.layer.crs().authid()
         self.GeoT = (self.xllcorner, self.layer.rasterUnitsPerPixelX(), 0, self.yllcorner, 0, self.layer.rasterUnitsPerPixelY())
         self.log("done header info")
-        self.log("header in layerStuff: " + str((self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj)))
+        self.log("header in layerLoader: " + str((self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj)))
 
     def run(self):
         self.log("starting run")
