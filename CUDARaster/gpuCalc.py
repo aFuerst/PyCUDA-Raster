@@ -118,6 +118,10 @@ class GPUCalculator(Process):
         for pipe in self.outputPipes:
             pipe.close()
 
+        self.data_gpu.free()
+        self.result_gpu.free()
+        cuda.Context.pop()            
+            
         self.log("GPU calculations finished")
 
     """
