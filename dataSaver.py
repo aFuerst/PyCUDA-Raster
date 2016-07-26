@@ -127,19 +127,33 @@ class dataSaver(Process):
     writes exactly as many rows as defined in the header
     """
     def _writeFunc(self):
+        write_rows = 50
         nrows = 0
         while nrows < self.totalRows:
-            # get line from pipe
-            try:
-                arr=self.input_pipe.recv()
-            except EOFError:
-                print "Pipe closed unexpectedly"
-                self.stop()
-            self.dataset.GetRasterBand(1).WriteArray(np.float32([arr]), 0, nrows)
-            if nrows % 50 == 0:
+            # get line from pipe   
+            arr = [] 
+            if nrows + write_rows >= self.totalRows:
+                for row in range(self.totalRows - nrows):
+                    try:
+                        arr.append(self.input_pipe.recv())
+                    except EOFError:
+                        print "Pipe closed unexpectedly"
+                        self.stop()
+            else:
+                for row in range(write_rows):
+                    try:
+                        arr.append(self.input_pipe.recv())
+                    except EOFError:
+                        print "Pipe closed unexpectedly"
+                        self.stop()
+            if len(arr) == 1:
+                arr = [arr]
+            self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
+            if nrows % (write_rows * 10) == 0:
                 self.dataset.FlushCache()
-            nrows+=1
-            self.pb.step(1)
+            nrows+=write_rows
+            self.pb.step(write_rows)
             self.rt.update()
         print "Output %s written to disk" % self.file_name
+
         
