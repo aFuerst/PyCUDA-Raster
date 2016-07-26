@@ -12,6 +12,24 @@ try:
 except ImportError:
     pass
 
+"""
+scheduler.py
+Starts and manages processes which load data, do raster calculations on GPU,
+and save data back to disk.
+
+copyright            : (C) 2016 by Alex Feurst, Charles Kazer, William Hoffman
+email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gulls.salisbury.edu
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ ***************************************************************************/
+ """
+
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
 # input and output files must have the same file type
