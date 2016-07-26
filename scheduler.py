@@ -25,8 +25,6 @@ email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gu
 
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
-# input and output files must have the same file type
-
 def run(inputFile, outputFiles, functions):
     
     # create input and output pipes    
@@ -36,7 +34,6 @@ def run(inputFile, outputFiles, functions):
         outputPipes.append(Pipe())
 
     loader = dataLoader.dataLoader(inputFile, inputPipe[0])
-    header = loader.getHeaderInfo()
     calc = gpuCalc.GPUCalculator(header, inputPipe[1], map((lambda x: x[0]), outputPipes), functions)
     savers = []
     for i in range(len(outputFiles)):
@@ -62,7 +59,7 @@ def run(inputFile, outputFiles, functions):
                 saver.stop()
             print "Error encountered in GPU calculater, ending tasks"
             break
-        sleep(1)
+        sleep(1)    
 
 if __name__ == '__main__':
     #If run from the command line, parse arguments.

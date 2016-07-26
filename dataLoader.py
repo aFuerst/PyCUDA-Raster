@@ -131,16 +131,25 @@ class dataLoader(Process):
     """
     def _getLines(self):
         line_num = 0
-        while line_num < self.totalRows:
+        while line_num <= self.totalRows:
             try:
-                line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,1,buf_type=self.dataType)
-                f=struct.unpack(self.unpackVal, line_tup)
-                self.output_pipe.send(np.float64(f))
+                if line_num == self.totalRows:
+                    return
+                if line_num == self.totalRows - 1:
+                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,1,buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal, line_tup)
+                    self.output_pipe.send(np.float64(f))
+                else:
+                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,2,buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal + self.unpackVal, line_tup)
+                    self.output_pipe.send(np.float64(f[:self.totalCols]))
+                    self.output_pipe.send(np.float64(f[self.totalCols:]))
             # EOF
-            except RuntimeError:
-                f=[]   
+            except RuntimeError as e:
+                f=[]
+                print e
                 return
-            line_num += 1
+            line_num += 2
 
     """
     _loadFunc

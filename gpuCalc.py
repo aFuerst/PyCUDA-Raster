@@ -212,11 +212,17 @@ class GPUCalculator(Process):
         self.func = self.kernel.get_function("raster_function")
 
         #GPU layout information
-        grid = (16,16)
+        grid = (256,256)
         block = (32,32,1)
         num_blocks = grid[0] * grid[1]
         threads_per_block = block[0]*block[1]*block[2]
-        pixels_per_thread = np.ceil((self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks))
+        pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)    
+        # minimize work by each thread while makeing sure each pixel is calculated   
+        while pixels_per_thread < 1:
+            grid = (grid[0] - 16,grid[1] - 16)
+            num_blocks = grid[0] * grid[1]
+            pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)
+        pixels_per_thread = np.ceil(pixels_per_thread)
 
         #information struct passed to GPU
         stc = GPUStruct([
