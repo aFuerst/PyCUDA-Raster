@@ -154,6 +154,7 @@ class dataSaver(Process):
             nrows+=write_rows
             self.pb.step(write_rows)
             self.rt.update()
+        self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name
 
         
