@@ -19,17 +19,20 @@ Dependencies:
     Numpy
         http://www.numpy.org/
 
+    Boost.Python (Part of the Boost Libraries)
+        http://www.boost.org/doc/libs/1_61_0/libs/python/doc/html/index.html
+
     Python GDAL
         https://pypi.python.org/pypi/GDAL/
 
     PyCUDA
         https://mathema.tician.de/software/pycuda/
 
-    The gpustruct class was taken from another git repo:
+    This list may not include all of the dependencies the above programs require.
+
+    The gpustruct class included here was taken from another git repo:
         https://github.com/compmem/cutools
     Thanks to OSU!
-
-    This list not not include any dependencies the above programs may require.
 
 Installation:
 
