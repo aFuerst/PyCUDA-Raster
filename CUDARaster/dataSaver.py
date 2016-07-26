@@ -37,7 +37,6 @@ class dataSaver(Process):
         output_file - must be a valid file path as a string
         header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
                  Includes geotiff information if a tif input was used.
-        file_type - a string which represents the file extension for input/output
         input_pipe - a Pipe object to read information from
 
     opens the output file and grabs the header information
@@ -122,9 +121,9 @@ class dataSaver(Process):
     stores open file object in instance variable 
     """
     def _openFile(self):
-        if exists(self.file_name):
+        if os.path.exists(self.file_name):
             self.log(self.file_name + " already exists. Deleting it...")
-            remove(self.file_name)
+            os.remove(self.file_name)
         self.driver = gdal.GetDriverByName('GTiff')
         self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
         self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
@@ -142,7 +141,6 @@ class dataSaver(Process):
     """
     def _writeFunc(self):
         nrows = 0
-        self.guiMade.wait()
         while nrows < self.totalRows:
             # get line from pipe
             try:

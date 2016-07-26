@@ -4,7 +4,6 @@ from gpustruct import GPUStruct
 
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
-import os.path, os
 
 TOTALROWCOUNT = 0
 
@@ -34,28 +33,23 @@ class GPUCalculator(Process):
 
     paramaters:
         header - six-tuple header expected to be in this order: (ncols, nrows, cellsize, NODATA, xllcorner, yllcorner)
-        _inputPipe - a Pipe object to read information from
+        _input_pipe - a Pipe object to read information from
         _outputPipe - a Pipe object to send information to
-        functionTypes - list of strings that are supported function names as strings
+        function_types - list of strings that are supported function names as strings
 
     creates empty instance variables needed later
     """
-    def __init__(self, header, _inputPipe, _outputPipes, functionTypes):
+    def __init__(self, header, _input_pipe, _output_pipes, function_types):
         Process.__init__(self)
-        print os.path.realpath(__file__)
-        if os.path.exists(os.path.realpath(__file__)[:-len("gpuCalc.py")] + "gpu_calc_log.txt"):
-            os.remove(os.path.realpath(__file__)[:-len("gpuCalc.py")] + "gpu_calc_log.txt")
-        self.logfile = open(os.path.realpath(__file__)[:-len("gpuCalc.py")] + "gpu_calc_log.txt", 'w')
-        #self.log( os.path.realpath(__file__)[:-10] + "gpu_calc_log.txt")
-        self.log("in gpu init")
+
         # CUDA device info
         self.device = None
         self.context = None
 
-        self.inputPipe = _inputPipe
-        self.outputPipes = _outputPipes
-        self.functions = functionTypes
-
+        self.input_pipe = _input_pipe
+        self.output_pipes = _output_pipes 
+        self.functions = function_types
+    
         #unpack header info
         self.totalCols = header[0]
         self.totalRows = header[1]
@@ -78,13 +72,11 @@ class GPUCalculator(Process):
         self.carry_over_rows[0].fill(self.NODATA)
         self.carry_over_rows[1].fill(self.NODATA)
 
-        self.log("gpu init done")
+    def __del__(self):
+        pass
 
-    def log(self, message):
-        self.logfile.write(str(message) + '\n')
-        print str(message)
-        self.logfile.flush()
-
+    #--------------------------------------------------------------------------#
+        
     """
     run
 
@@ -95,45 +87,42 @@ class GPUCalculator(Process):
     does CUDA initialization and sets local device and context
     """
     def run(self):
-        self.log("in gpu run")
         cuda.init()
         self.device = cuda.Device(0)
         self.context = self.device.make_context()
 
         self._gpuAlloc()
 
-        self.kernel = self.get_kernel()
-        self.func = self.kernel.get_function("raster_function")
-
         #Process data while we continue to receive input
         count = 0
-        while self.recv_data(count):
-            #self.log(count)
+        while self._recvData(count):
             #Copy input data to GPU
             cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
             for i in range(len(self.functions)):
-                self.process_data(self.functions[i])
+                self._processData(self.functions[i])
                 #Get data back from GPU
                 cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
-                self.write_data(count, self.outputPipes[i])
+                self._writeData(count, self.output_pipes[i])
 
             count += (self.maxPossRows-2)  # -2 because of buffer rows
-            self.log("Page done... %.3f %% completed" % ((float(count) / float(self.totalRows)) * 100))
+            print "Page done... %.3f %% completed" % ((float(count) / float(self.totalRows)) * 100)
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):
-            self.process_data(self.functions[i])
+            self._processData(self.functions[i])
             cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu) 
-            self.write_data(count, self.outputPipes[i])
+            self._writeData(count, self.output_pipes[i])
 
-        for pipe in self.outputPipes:
+        for pipe in self.output_pipes:
             pipe.close()
 
+        print "GPU calculations finished"
+        # clean up on GPU
         self.data_gpu.free()
         self.result_gpu.free()
-        cuda.Context.pop()            
-            
-        self.log("GPU calculations finished")
+        cuda.Context.pop()
+
+    #--------------------------------------------------------------------------#
 
     """
     _gpuAlloc
@@ -147,7 +136,7 @@ class GPUCalculator(Process):
         self.maxPossRows = np.int(np.floor(self.freeMem / (8 * self.totalCols)))
         # set max rows to smaller number to save memory usage
         if self.totalRows < self.maxPossRows:
-            self.log("reducing max rows to reduce memory use on GPU")
+            print "reducing max rows to reduce memory use on GPU"
             self.maxPossRows = self.totalRows
             #self.maxPossRows = 100
 
@@ -157,8 +146,10 @@ class GPUCalculator(Process):
         self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
         self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
 
+    #--------------------------------------------------------------------------#
+
     """
-    recv_data
+    _recvData
 
     Receives a page worth of data from the input pipe. The input pipe comes
     from dataLoader.py. Copies over 2 rows from the previous page so the GPU 
@@ -166,7 +157,7 @@ class GPUCalculator(Process):
     If the pipe closes, fill the rest of the page with NODATA, and return false
     to indicate that we should break out of the processing loop.
     """
-    def recv_data(self, count):
+    def _recvData(self, count):
         if count == 0:
             #If this is the first page, insert a buffer row
             for col in range(self.totalCols):
@@ -181,25 +172,23 @@ class GPUCalculator(Process):
 
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
-            #print row_count, count
             try:
-                # check if something is in the pipe for 5 seconds
                 if count + row_count > self.totalRows:
                     # end of file reached       
                     cur_row = None             
-                    raise EOFError
+                    for col in range(self.totalCols):
+                        self.to_gpu_buffer[row_count][col] = self.NODATA
+                    return False
                 else:
-                    cur_row = self.inputPipe.recv()
+                    cur_row = self.input_pipe.recv()
 
                 for col in range(self.totalCols):
                     self.to_gpu_buffer[row_count][col] = cur_row[col]
 
-            #Pipe was closed, no more input data
+            #Pipe was closed unexpectedly
             except EOFError:
-                #Write a NODATA buffer row
-                for col in range(self.totalCols):
-                    self.to_gpu_buffer[row_count][col] = self.NODATA
-                return False
+                print "Pipe closed unexpectedly."
+                self.stop()
 
             row_count += 1
             
@@ -209,21 +198,31 @@ class GPUCalculator(Process):
 
         return True
 
+    #--------------------------------------------------------------------------#
+
 
     """
-    process_data
+    _processData
 
     Using the given kernel code packed in mod, allocates memory on the GPU,
-    copies input data from a pagelocked buffer, runs the kernel and copies 
-    the output to a second pagelocked buffer
+    and runs the kernel.
     """
-    def process_data(self, funcType):
+    def _processData(self, funcType):
+        self.kernel = self._getKernel(funcType)
+        self.func = self.kernel.get_function("raster_function")
+
         #GPU layout information
-        grid = (16,16)
+        grid = (256,256)
         block = (32,32,1)
         num_blocks = grid[0] * grid[1]
         threads_per_block = block[0]*block[1]*block[2]
-        pixels_per_thread = np.ceil((self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks))
+        pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)    
+        # minimize work by each thread while makeing sure each pixel is calculated   
+        while pixels_per_thread < 1:
+            grid = (grid[0] - 16,grid[1] - 16)
+            num_blocks = grid[0] * grid[1]
+            pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)
+        pixels_per_thread = np.ceil(pixels_per_thread)
 
         #information struct passed to GPU
         stc = GPUStruct([
@@ -232,8 +231,7 @@ class GPUCalculator(Process):
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
-            (np.float64, 'cellSize', self.cellsize),
-            (np.int32, 'function', self.getFunctionVal(funcType))
+            (np.float64, 'cellSize', self.cellsize)
             ])
 
         stc.copy_to_gpu()
@@ -241,38 +239,20 @@ class GPUCalculator(Process):
         #Call GPU kernel
         self.func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
 
-    def getFunctionVal(self, func):
-        if func == "slope":
-            return 0        
-        elif func == "aspect":
-            return 1
-        elif func == "hillshade":
-            return 2
-        else:
-            self.log("Illegal function chosen")
-            raise NotImplemented
+    #--------------------------------------------------------------------------#
 
     """
-    write_data
+    _writeData
 
     Writes results to output pipe. This pipe goes to dataSaver.py
     """
-    def write_data(self, count, outPipe):
-        """
-        #skip first and last rows, since they were buffers in the computation
-        max = self.maxPossRows
-        # see if written out more than total number of rows plus a small buffer
-        # pipe.send seems to sopt working after too many sends and nothing is taken off
-        if count + max > self.totalRows:
-            max = self.totalRows - count
-        for row in range(1, max):
-            outPipe.send(self.from_gpu_buffer[row])
-        """
+    def _writeData(self, count, out_pipe):
         for row in range(1, self.maxPossRows-1):
-            #self.log("gpu sending row" + str(count + row))
             if count + row > self.totalRows:
                 break
-            outPipe.send(self.from_gpu_buffer[row])
+            out_pipe.send(self.from_gpu_buffer[row])
+
+    #--------------------------------------------------------------------------#
 
     """
     stop 
@@ -280,29 +260,156 @@ class GPUCalculator(Process):
     Alerts the thread that it needs to quit
     """
     def stop(self):
-        self.log("Stopping gpuCalc...")
-        #self.data_gpu.free()
-        #self.result_gpu.free()
+        print "Stopping gpuCalc..."
         exit(1)
 
-    """
-    get_kernel
+    #--------------------------------------------------------------------------#
 
-    given a string argument, packages a module for that kernel.
     """
-    # NOTE: To create another kernel, add another if statement checking for
-    # the string you will identify the kernel by. Then return a SourceModule
-    # containing that kernel. Currently, our input/output code in recv_data
-    # and write_data assumes that the kernel will treat the first and last
-    # row of a given page as buffers that won't be written out.
-    # HOWEVER, recv_data is set up so that the last two rows of the preceeding
-    # page are used as the first two in the current one. This ensures that the
-    # last row of the preceeding page will still be analyzed.
-    def get_kernel(self):
+    _getRasterFunc
+
+    Given a string representing the raster function to calculate,
+    returns the required code to append to the CUDA kernel.
+    """
+    # NOTE: The kernel code in _getKernel only supports functions that are based
+    # on a 3x3 grid of neighbors.
+    #
+    # To add your own computation, add an if statement looking for it, and return
+    # a tuple containg the C code for your function surrounded by triple quotes,
+    # and how that function should be called within the code in _getKernel.
+    # 
+    # Possible parameters you can use from _getKernel:
+    # dz_dx
+    # dz_dy
+    # file_info->pixels_per_thread
+    # file_info->NODATA
+    # file_info->ncols
+    # file_info->nrows
+    # file_info->npixels
+    # file_info->cellSize
+
+    def _getRasterFunc(self, func):
+        if func == "slope":
+            return (\
+                """
+                /*
+                    GPU only function that calculates slope for a pixel
+                */
+                __device__ double slope(double dz_dx, double dz_dy){
+                    return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
+                }
+                """,\
+                """
+                slope(dz_dx, dz_dy)
+                """)
+
+        elif func == "aspect":
+            return (\
+                """
+                /*
+                    GPU only function that calculates aspect for a pixel
+                */
+                __device__ double aspect(double dz_dx, double dz_dy, double NODATA){
+                    double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
+                    if(dz_dx == NODATA || dz_dy == NODATA || (dz_dx == 0.0 && dz_dy == 0.0)){
+                        return NODATA;
+                    } else{
+                        if(aspect > 90.0){
+                            aspect = 360.0 - aspect + 90.0;
+                        } else {
+                            aspect = 90.0 - aspect;
+                        }
+                            aspect = aspect * (M_PI / 180.0);
+                            return aspect;
+                        }
+                }
+                """,\
+                """
+                aspect(dz_dx, dz_dy, file_info->NODATA)
+                """)
+
+        elif func == "hillshade":
+            return (self._getRasterFunc('slope')[0] + \
+                """
+                /*
+                    GPU only function that calculates aspect for a pixel
+                    to be ONLY used by hillshade
+                */    
+                __device__ double hillshade_aspect(double dz_dx, double dz_dy){
+                    double aspect;
+                            if(dz_dx != 0){
+                                aspect = atan2(dz_dy, -(dz_dx));
+                                if(aspect < 0){
+                                    aspect = ((2 * M_PI) + aspect);
+                            }
+                        } else if(dz_dx == 0){
+                            if(dz_dy > 0){
+                                    aspect = (M_PI / 2);
+                                }else if(dz_dy < 0){
+                                    aspect = ((2 * M_PI) - (M_PI / 2));
+                                }else{
+                                    aspect = atan2(dz_dy, -(dz_dx));
+                            }
+                        }
+                    return aspect;
+                }
+
+                /*
+                    GPU only function that calculates hillshade for a pixel
+                */
+                __device__ double hillshade(double dz_dx, double dz_dy){
+                    /* calc slope and aspect */
+                    double slp = slope(dz_dx, dz_dy);
+                    double asp = hillshade_aspect(dz_dx, dz_dy);
+
+                    /* calc zenith */
+                        double altitude = 45;
+                        double zenith_deg = 90 - altitude;
+                        double zenith_rad = zenith_deg * (M_PI / 180.0);
+    
+                    /* calc azimuth */
+                        double azimuth = 315;
+                        double azimuth_math = (360 - azimuth + 90);
+                        if(azimuth_math >= 360.0){
+                                azimuth_math = azimuth_math - 360;
+                    }	
+                    double azimuth_rad = (azimuth_math * M_PI / 180.0);
+
+                    double hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
+
+                        if(hs < 0){
+                                return 0;
+                    } else {
+                        return hs;
+                    }
+                }
+                """,\
+                """
+                hillshade(dz_dx, dz_dy)
+                """)
+
+    #--------------------------------------------------------------------------#
+
+    """
+    _getKernel
+
+    Packages the kernel module. This kernel assumes that the raster calculations
+    will be based on the dx_dz and dy_dz values, which are calculated from a 3x3
+    grid surrounding the current pixel.
+    """
+    # NOTE: To create another raster function, you must create an additional
+    # entry in _getRasterCalc. Currently only supports calculations based on a
+    # 3x3 grid surrounding a pixel.
+    # The GPUCalculator class is set up to automatically insert buffer rows at
+    # the beginning and end of the file so that all rows are calculated correctly.
+    def _getKernel(self, funcType):
+        func_def, func_call = self._getRasterFunc(funcType)
         mod = SourceModule("""
                     #include <math.h>
                     #include <stdio.h>
-
+                    #ifndef M_PI
+                    #define M_PI 3.14159625
+                    #endif
                     typedef struct{
                             double pixels_per_thread;
                             double NODATA;
@@ -310,7 +417,6 @@ class GPUCalculator(Process):
                             unsigned long long nrows;
                             unsigned long long npixels;
                             double cellSize;
-                            int function;
                     } passed_in;
 
                     /************************************************************************************************
@@ -341,85 +447,9 @@ class GPUCalculator(Process):
                             /* return a value otherwise it throws a warning expression not having effect */
                             return 0;
                     }
-
-                    /*
-                        GPU only function that calculates slope for a pixel
-                    */
-                    __device__ double slope(double dz_dx, double dz_dy){
-                        return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
-                    }
-
-                    /*
-                        GPU only function that calculates aspect for a pixel
-                    */
-                    __device__ double aspect(double dz_dx, double dz_dy, double NODATA){
-                        double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
-                        if(dz_dx == NODATA || dz_dy == NODATA || (dz_dx == 0.0 && dz_dy == 0.0)){
-                            return NODATA;
-                        } else{
-                            if(aspect > 90.0){
-                                aspect = 360.0 - aspect + 90.0;
-                            } else {
-                                aspect = 90.0 - aspect;
-                            }
-                                aspect = aspect * (M_PI / 180.0);
-                                return aspect;
-                            }
-                        }
-
-                    /*
-                        GPU only function that calculates aspect for a pixel
-                        to be ONLY used by hillshade
-                    */    
-                    __device__ double hillshade_aspect(double dz_dx, double dz_dy){
-                        double aspect;
-                        	if(dz_dx != 0){
-                        	    aspect = atan2(dz_dy, -(dz_dx));
-                        	    if(aspect < 0){
-                        	        aspect = ((2 * M_PI) + aspect);
-                                }
-                            } else if(dz_dx == 0){
-                            	if(dz_dy > 0){
-                        	        aspect = (M_PI / 2);
-                        	    }else if(dz_dy < 0){
-                        	        aspect = ((2 * M_PI) - (M_PI / 2));
-                        	    }else{
-                        	        aspect = atan2(dz_dy, -(dz_dx));
-                                }
-                            }
-                        return aspect;
-                    }
-
-                    /*
-                        GPU only function that calculates hillshade for a pixel
-                    */
-                    __device__ double hillshade(double dz_dx, double dz_dy){
-                        /* calc slope and aspect */
-                        double slp = slope(dz_dx, dz_dy);
-                        double asp = hillshade_aspect(dz_dx, dz_dy);
-
-                        /* calc zenith */
-	                    double altitude = 45;
-	                    double zenith_deg = 90 - altitude;
-	                    double zenith_rad = zenith_deg * (M_PI / 180.0);
-	
-                        /* calc azimuth */
-	                    double azimuth = 315;
-	                    double azimuth_math = (360 - azimuth + 90);
-	                    if(azimuth_math >= 360.0){
-		                    azimuth_math = azimuth_math - 360;
-                        }	
-                        double azimuth_rad = (azimuth_math * M_PI / 180.0);
-
-                        double hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
-
-	                    if(hs < 0){
-		                    return 0;
-                        } else {
-                            return hs;
-                        }
-                    }
-
+                    """\
+                            + func_def + \
+                    """
                     /************************************************************************************************
                             CUDA Kernel function to calculate the slope of pixels in 'data' and stores them in 'result'
                             handles a variable number of calculations based on its thread/block location 
@@ -452,18 +482,8 @@ class GPUCalculator(Process):
                                             }
                                             double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8 * file_info -> cellSize);
                                             double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8 * file_info -> cellSize);
-                                            /* choose which function to execute */
-                                            switch(file_info -> function){
-                                                case 0:
-                                                    result[offset] = slope(dz_dx, dz_dy);
-                                                break;
-                                                case 1:
-                                                    result[offset] = aspect(dz_dx, dz_dy, file_info -> NODATA);
-                                                break;
-                                                case 2:
-                                                    result[offset] = hillshade(dz_dx, dz_dy);
-                                                break;                        
-                                            }
+
+                                            result[offset] =""" + func_call + """;
                                         }
                                     }
                                     offset += (gridDim.x*blockDim.x) * (gridDim.y*blockDim.y);
@@ -472,4 +492,3 @@ class GPUCalculator(Process):
                     }
                     """)
         return mod
-
