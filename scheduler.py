@@ -34,6 +34,7 @@ def run(inputFile, outputFiles, functions):
         outputPipes.append(Pipe())
 
     loader = dataLoader.dataLoader(inputFile, inputPipe[0])
+    header = loader.getHeaderInfo()
     calc = gpuCalc.GPUCalculator(header, inputPipe[1], map((lambda x: x[0]), outputPipes), functions)
     savers = []
     for i in range(len(outputFiles)):
