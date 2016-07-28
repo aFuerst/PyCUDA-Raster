@@ -42,11 +42,12 @@ class dataSaver(Process):
     opens the output file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, _output_file,  header, _input_pipe):
+    def __init__(self, _output_file,  header, _input_pipe, _disk_rows):
         Process.__init__(self)
     
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
+        self.write_rows = _disk_rows
 
         #unpack header info
         self.totalCols = header[0]
@@ -97,9 +98,12 @@ class dataSaver(Process):
     stop
     
     Alerts the thread that it needs to quit
+    Closes file and pipes
     """
     def stop(self):
         print "Stopping saver ", self.file_name ," ..."
+        self._closeFile()
+        self.input_pipe.close()
         exit(1)
 
     """
@@ -113,13 +117,14 @@ class dataSaver(Process):
             print self.file_name, "already exists. Deleting it..."
             remove(self.file_name)
         self.driver = gdal.GetDriverByName('GTiff')
-        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32, options = ['COMPRESS=DEFLATE', 'BIGTIFF=YES'])
         self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
         self.dataset.SetGeoTransform(self.GeoT)
         try:
             self.dataset.SetProjection(str(self.prj))
         except RuntimeError:
             self.dataset.SetProjection('')
+
     """
     _writeFunc
 
@@ -127,12 +132,12 @@ class dataSaver(Process):
     writes exactly as many rows as defined in the header
     """
     def _writeFunc(self):
-        write_rows = 50
+        #write_rows = 50
         nrows = 0
         while nrows < self.totalRows:
             # get line from pipe   
             arr = [] 
-            if nrows + write_rows >= self.totalRows:
+            if nrows + self.write_rows >= self.totalRows:
                 for row in range(self.totalRows - nrows):
                     try:
                         arr.append(self.input_pipe.recv())
@@ -140,7 +145,7 @@ class dataSaver(Process):
                         print "Pipe closed unexpectedly"
                         self.stop()
             else:
-                for row in range(write_rows):
+                for row in range(self.write_rows):
                     try:
                         arr.append(self.input_pipe.recv())
                     except EOFError:
@@ -149,10 +154,10 @@ class dataSaver(Process):
             if len(arr) == 1:
                 arr = [arr]
             self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
-            if nrows % (write_rows * 10) == 0:
+            if nrows % (self.write_rows * 10) == 0:
                 self.dataset.FlushCache()
-            nrows+=write_rows
-            self.pb.step(write_rows)
+            nrows+=self.write_rows
+            self.pb.step(self.write_rows)
             self.rt.update()
         self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name

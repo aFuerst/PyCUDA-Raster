@@ -25,20 +25,19 @@ email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gu
 
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
-def run(inputFile, outputFiles, functions):
-    
+def run(inputFile, outputFiles, functions, disk_rows):
     # create input and output pipes    
     inputPipe = Pipe()
     outputPipes = []
     for i in range(len(outputFiles)):
         outputPipes.append(Pipe())
 
-    loader = dataLoader.dataLoader(inputFile, inputPipe[0])
+    loader = dataLoader.dataLoader(inputFile, inputPipe[0], disk_rows)
     header = loader.getHeaderInfo()
     calc = gpuCalc.GPUCalculator(header, inputPipe[1], map((lambda x: x[0]), outputPipes), functions)
     savers = []
     for i in range(len(outputFiles)):
-        savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1]))
+        savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1], disk_rows))
 
     # start all threads
     loader.start()
@@ -67,7 +66,9 @@ if __name__ == '__main__':
     from sys import argv
     outFiles = []
     funcs = []
-    for i in range(2,len(argv),2):
+    disk_rows = 30
+    for i in range(2,len(argv), 2):
         outFiles.append(argv[i])
         funcs.append(argv[i+1].lower())
-    run(argv[1], outFiles, funcs)
+    run(argv[1], outFiles, funcs, disk_rows)
+

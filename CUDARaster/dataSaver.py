@@ -109,9 +109,12 @@ class dataSaver(Process):
     stop
     
     Alerts the thread that it needs to quit
+    Closes file and pipes
     """
     def stop(self):
         self.log("Stopping saver " + self.file_name  +" ...")
+        self._closeFile()
+        self.input_pipe.close()
         exit(1)
 
     """

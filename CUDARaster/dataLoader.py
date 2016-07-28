@@ -115,9 +115,13 @@ class dataLoader(Process):
     stop 
 
     Alerts the thread that it needs to quit
+    Closes file and pipe
     """
     def stop(self):
         self.log("Stopping loader...")
+        self.open_file = None
+        self.open_raster_band = None
+        self.output_pipe.close()
         exit(1)
 
     """

@@ -38,8 +38,9 @@ class dataLoader(Process):
     opens the input file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, _input_file, _output_pipe):
+    def __init__(self, _input_file, _output_pipe, _disk_rows):
         Process.__init__(self)
+        self.read_rows = _disk_rows
         self.output_pipe = _output_pipe
         self.file_name = _input_file
         self.file_type = None
@@ -109,9 +110,13 @@ class dataLoader(Process):
     stop 
 
     Alerts the thread that it needs to quit
+    Closes file and pipe
     """
     def stop(self):
         print "Stopping loader..."
+        self.open_file = None
+        self.open_raster_band = None
+        self.output_pipe.close()
         exit(1)
 
     """
@@ -130,28 +135,27 @@ class dataLoader(Process):
     to the GPUCalculator class
     """
     def _getLines(self):
-        read_rows = 50
         line_num = 0
         while line_num <= self.totalRows:
             if line_num == self.totalRows:
                 return
             try:
-                if line_num + read_rows >= self.totalRows - 1:
+                if line_num + self.read_rows >= self.totalRows - 1:
                     remaining = self.totalRows - line_num
                     line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,remaining,buf_type=self.dataType)
                     f=struct.unpack(self.unpackVal*remaining, line_tup)
                     for line in range(remaining):
                         self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
                 else:
-                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,read_rows,buf_type=self.dataType)
-                    f=struct.unpack(self.unpackVal*read_rows, line_tup)
-                    for line in range(read_rows):
+                    line_tup = self.open_raster_band.ReadRaster(0, line_num, self.totalCols, self.read_rows, buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal*self.read_rows, line_tup)
+                    for line in range(self.read_rows):
                         self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
             # EOF
             except RuntimeError as e:
                 print e
                 return
-            line_num += read_rows
+            line_num += self.read_rows
 
     """
     _loadFunc

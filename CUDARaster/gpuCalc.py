@@ -258,9 +258,16 @@ class GPUCalculator(Process):
     stop 
 
     Alerts the thread that it needs to quit
+    Cleans up CUDA and pipes
     """
     def stop(self):
         print "Stopping gpuCalc..."
+        self.data_gpu.free()
+        self.result_gpu.free()
+        cuda.Context.pop()
+        for pipe in self.output_pipes:
+            pipe.close()
+        self.input_pipe.close()
         exit(1)
 
     #--------------------------------------------------------------------------#
