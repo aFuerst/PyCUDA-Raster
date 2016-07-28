@@ -93,13 +93,18 @@ class GPUCalculator(Process):
 
         self._gpuAlloc()
 
+        compiled_kernels = []
+        for function in self.functions:
+            kernel = self._getKernel(function)
+            compiled_kernels.append(kernel.get_function("raster_function"))
+
         #Process data while we continue to receive input
         count = 0
         while self._recvData(count):
             #Copy input data to GPU
             cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
-            for i in range(len(self.functions)):
-                self._processData(self.functions[i])
+            for i in range(len(compiled_kernels)):
+                self._processData(compiled_kernels[i])
                 #Get data back from GPU
                 cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
                 self._writeData(count, self.output_pipes[i])
@@ -109,7 +114,7 @@ class GPUCalculator(Process):
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):
-            self._processData(self.functions[i])
+            self._processData(compiled_kernels[i])
             cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu) 
             self._writeData(count, self.output_pipes[i])
 
@@ -138,7 +143,6 @@ class GPUCalculator(Process):
         if self.totalRows < self.maxPossRows:
             print "reducing max rows to reduce memory use on GPU"
             self.maxPossRows = self.totalRows
-            #self.maxPossRows = 100
 
         # create pagelocked buffers and GPU arrays
         self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
@@ -207,10 +211,7 @@ class GPUCalculator(Process):
     Using the given kernel code packed in mod, allocates memory on the GPU,
     and runs the kernel.
     """
-    def _processData(self, funcType):
-        self.kernel = self._getKernel(funcType)
-        self.func = self.kernel.get_function("raster_function")
-
+    def _processData(self, func):
         #GPU layout information
         grid = (256,256)
         block = (32,32,1)
@@ -222,8 +223,8 @@ class GPUCalculator(Process):
             grid = (grid[0] - 16,grid[1] - 16)
             num_blocks = grid[0] * grid[1]
             pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)
-        pixels_per_thread = np.ceil(pixels_per_thread)
-
+        pixels_per_thread = np.ceil(pixels_per_thread)   
+        
         #information struct passed to GPU
         stc = GPUStruct([
             (np.float64, 'pixels_per_thread', pixels_per_thread),
@@ -235,9 +236,8 @@ class GPUCalculator(Process):
             ])
 
         stc.copy_to_gpu()
-
         #Call GPU kernel
-        self.func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
+        func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
 
     #--------------------------------------------------------------------------#
 
@@ -258,9 +258,16 @@ class GPUCalculator(Process):
     stop 
 
     Alerts the thread that it needs to quit
+    Cleans up CUDA and pipes
     """
     def stop(self):
         print "Stopping gpuCalc..."
+        self.data_gpu.free()
+        self.result_gpu.free()
+        cuda.Context.pop()
+        for pipe in self.output_pipes:
+            pipe.close()
+        self.input_pipe.close()
         exit(1)
 
     #--------------------------------------------------------------------------#
@@ -279,14 +286,15 @@ class GPUCalculator(Process):
     # and how that function should be called within the code in _getKernel.
     # 
     # Possible parameters you can use from _getKernel:
-    # dz_dx
-    # dz_dy
-    # file_info->pixels_per_thread
-    # file_info->NODATA
-    # file_info->ncols
-    # file_info->nrows
-    # file_info->npixels
-    # file_info->cellSize
+    # double *nbhd      /* this is the 3x3 grid of neighbors */
+    # double dz_dx
+    # double dz_dy
+    # double file_info->pixels_per_thread
+    # double file_info->NODATA
+    # unsigned long long file_info->ncols
+    # unsigned long long file_info->nrows
+    # unsigned long long file_info->npixels
+    # double file_info->cellSize
 
     def _getRasterFunc(self, func):
         if func == "slope":
@@ -387,6 +395,9 @@ class GPUCalculator(Process):
                 """
                 hillshade(dz_dx, dz_dy)
                 """)
+        else:
+            print "Function not implemented"
+            raise NotImplementedError
 
     #--------------------------------------------------------------------------#
 
@@ -492,3 +503,4 @@ class GPUCalculator(Process):
                     }
                     """)
         return mod
+

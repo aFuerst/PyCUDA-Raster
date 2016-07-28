@@ -93,13 +93,18 @@ class GPUCalculator(Process):
 
         self._gpuAlloc()
 
+        compiled_kernels = []
+        for function in self.functions:
+            kernel = self._getKernel(function)
+            compiled_kernels.append(kernel.get_function("raster_function"))
+
         #Process data while we continue to receive input
         count = 0
         while self._recvData(count):
             #Copy input data to GPU
             cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
-            for i in range(len(self.functions)):
-                self._processData(self.functions[i])
+            for i in range(len(compiled_kernels)):
+                self._processData(compiled_kernels[i])
                 #Get data back from GPU
                 cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
                 self._writeData(count, self.output_pipes[i])
@@ -109,7 +114,7 @@ class GPUCalculator(Process):
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):
-            self._processData(self.functions[i])
+            self._processData(compiled_kernels[i])
             cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu) 
             self._writeData(count, self.output_pipes[i])
 
@@ -207,10 +212,7 @@ class GPUCalculator(Process):
     Using the given kernel code packed in mod, allocates memory on the GPU,
     and runs the kernel.
     """
-    def _processData(self, funcType):
-        self.kernel = self._getKernel(funcType)
-        self.func = self.kernel.get_function("raster_function")
-
+    def _processData(self, func):
         #GPU layout information
         grid = (256,256)
         block = (32,32,1)
@@ -237,7 +239,7 @@ class GPUCalculator(Process):
         stc.copy_to_gpu()
 
         #Call GPU kernel
-        self.func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
+        func(self.data_gpu, self.result_gpu, stc.get_ptr(), block=block, grid=grid)
 
     #--------------------------------------------------------------------------#
 

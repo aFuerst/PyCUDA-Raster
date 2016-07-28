@@ -25,7 +25,7 @@ email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gu
 
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
-def run(inputFile, outputFiles, functions, disk_rows):
+def run(inputFile, outputFiles, functions, disk_rows = 30):
     # create input and output pipes    
     inputPipe = Pipe()
     outputPipes = []
