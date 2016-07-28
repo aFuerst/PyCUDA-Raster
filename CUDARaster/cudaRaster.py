@@ -84,10 +84,6 @@ class CUDARaster:
         self.dlg.aspect_check.setChecked(False)
         self.dlg.hillshade_check.setChecked(False)
 
-        # supported output types
-        self.output_types = [".tif", ".asc"]
-        self.dlg.output_file_type_box.addItems(self.output_types)
-
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -233,7 +229,6 @@ class CUDARaster:
             if selected_index != 0:
                 input_file = self.layers[selected_index-1]
                 input_file_name = input_file.name()
-                extension = self.output_types[self.dlg.output_file_type_box.currentIndex()]
                 print "file name: ", input_file_name
                 if name == 'posix':
                     #input_file = input_file[input_file.rfind('/')+1:]
@@ -243,7 +238,6 @@ class CUDARaster:
 
             else:
                 input_file = self.dlg.input_line.text()
-                extension = self.dlg.input_line.text()[-4:]
                 if input_file == "":
                     print "NO OPTION SELECTED!"
                     return

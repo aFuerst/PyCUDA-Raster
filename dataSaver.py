@@ -123,6 +123,7 @@ class dataSaver(Process):
         try:
             self.dataset.SetProjection(str(self.prj))
         except RuntimeError:
+            print "Warning: Invalid projection."
             self.dataset.SetProjection('')
 
     """

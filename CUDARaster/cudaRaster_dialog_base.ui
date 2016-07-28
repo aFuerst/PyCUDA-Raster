@@ -126,7 +126,9 @@
    <property name="text">
     <string>If the input is foo and the selected function is bar, then output will be saved in the selected folder as foo_bar
 
-Only support .asc and .tif files</string>
+Only one of Input Layer or Input File should be used, Trying to use both leads to undefined behavior.
+
+Only support reading .asc and .tif files from disk</string>
    </property>
    <property name="wordWrap">
     <bool>true</bool>
@@ -168,16 +170,6 @@ Only support .asc and .tif files</string>
     </rect>
    </property>
   </widget>
-  <widget class="QComboBox" name="output_file_type_box">
-   <property name="geometry">
-    <rect>
-     <x>520</x>
-     <y>30</y>
-     <width>61</width>
-     <height>22</height>
-    </rect>
-   </property>
-  </widget>
   <widget class="QLabel" name="label_4">
    <property name="geometry">
     <rect>
@@ -188,7 +180,7 @@ Only support .asc and .tif files</string>
     </rect>
    </property>
    <property name="text">
-    <string>input Layer</string>
+    <string>Input Layer</string>
    </property>
   </widget>
   <widget class="QCheckBox" name="qgis_slope_check">
