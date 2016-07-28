@@ -64,7 +64,7 @@ class layerLoader(Process):
         loc = s.find("No Data Value</p>\n<p>") + len("No Data Value</p>\n<p>")
         loc2 = s.find("<", loc)
         self.NODATA = np.float64(s[loc:loc2])
-        self.prj = self.layer.crs().authid()
+        self.prj = self.layer.crs().toWkt()
         self.GeoT = (self.xllcorner, self.layer.rasterUnitsPerPixelX(), 0, self.yllcorner, 0, self.layer.rasterUnitsPerPixelY())
         self.log("done header info")
         self.log("header in layerLoader: " + str((self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj)))
