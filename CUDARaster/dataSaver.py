@@ -103,6 +103,7 @@ class dataSaver(Process):
     """
     def _closeFile(self):
         self.dataset.FlushCache()
+        self.dataset = None
 
 
     """
@@ -153,14 +154,14 @@ class dataSaver(Process):
                     try:
                         arr.append(self.input_pipe.recv())
                     except EOFError:
-                        print "Pipe closed unexpectedly"
+                        self.log("Pipe closed unexpectedly")
                         self.stop()
             else:
                 for row in range(write_rows):
                     try:
                         arr.append(self.input_pipe.recv())
                     except EOFError:
-                        print "Pipe closed unexpectedly"
+                        self.log("Pipe closed unexpectedly")
                         self.stop()
             if len(arr) == 1:
                 arr = [arr]
@@ -170,5 +171,6 @@ class dataSaver(Process):
             nrows+=write_rows
             self.pb.step(write_rows)
             self.rt.update()
+        self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name
 
