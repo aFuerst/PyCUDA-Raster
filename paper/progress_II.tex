@@ -91,7 +91,7 @@
 % *** GRAPHICS RELATED PACKAGES ***
 %
 \ifCLASSINFOpdf
-  % \usepackage[pdftex]{graphicx}
+  \usepackage[pdftex]{graphicx}
   % declare the path(s) where your graphic files are
   % \graphicspath{{../pdf/}{../jpeg/}}
   % and their extensions so you won't have to specify these with
@@ -454,7 +454,7 @@ created a C++ library for parallel raster file processing, though this only
 uses CPU parallelization. \cite{benedicic} created a GRASS GIS module based on
 cluster computing designed to predict radio-coverage.  GIS algorithms have also
 been parallelized over clusters of machines rather than just CPU
-parallelization, such as in \cite{hunag}.  \cite{hpc_cuda} developed a C++
+parallelization, such as in \cite{huang}.  \cite{hpc_cuda} developed a C++
 library for simple raster calculations using CUDA as an extension to the
 proprietary ArcGIS software. We want to progress the work of \cite{hpc_cuda} to
 be more accessible to the GIS community.
@@ -504,8 +504,26 @@ GPU and executes the kernel. This program is initialized by a simple QGIS
 plugin which hands it the input and output information. We designed all of the
 I/O components to run independent of the central algorithm so that anyone can
 write their own computation kernel.
+
     \subsection{Scheduler Model}
     %Include pic of model. Talk about work flow
+    \begin{figure}
+        \includegraphics[width=\linewidth]{model.png}
+        \caption{Main work flow model.}
+        \label{model}
+    \end{figure}
+    The previous work done in \cite{hpc_cuda} revealed that the greatest
+    hindrance to performance in GPU based GIS calculations is the transfer of
+    data from disk to main memory, and then from main memory to GPU memory.
+    Memory transfer must occur four times for each GPU job, loading from disk
+    to main memory, loading from main memory to GPU memory, and then copying
+    results from GPU memory back to main memory, and then to disk.  Further
+    compounding the problem is that GPU memory is typically more limited than
+    main memory, so multiple copies from main memory are required for files
+    larger than the available memory on the GPU. Thus we have designed our
+    workflow to try to mitigate the effects of the I/O bottleneck.
+
+
     \subsection{GPU Kernel}
     %Describe generally algorithm used by GPU Kernel, row wise grid striding loop
     \subsection{GIS Algorithms}
@@ -531,11 +549,11 @@ time on for the PyCUDA version appears to be instantaneous after reading the
 file into memory, while calculations in QGIS are noticeably taking time to
 complete. Moving on to even larger file sizes, in the GB range, is where
 conflicts arose. While testing  a 3.1 GB file, the PyCUDA implementation completed
-in 11 minutes, only a minute slower than QGIS. A simmilar occurence happened with
+in 11 minutes, only a minute slower than QGIS. A similar occurrence happened with
 a larger 8 GB file, with the PyCUDA taking 15 minutes more than QGIS. These times
-are very encouraging, showing that Python code is aproaching equal times with QGIS.
+are very encouraging, showing that Python code is approaching equal times with QGIS.
 We are confident that these times can be lowered as we work to fix bugs in our
-current codebase and explore options to optimize our current algorithms.
+current code base and explore options to optimize our current algorithms.
 
 \section{Conclusion}
 We have developed a PyCUDA based, open source raster calculation plugin for
