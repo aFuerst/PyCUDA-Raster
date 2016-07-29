@@ -600,6 +600,11 @@ be more accessible to the GIS community.
     Our program's structure follows the model in figure \ref{model}. The
     following sections describe the implementation of each process.
     \subsection{Scheduler}
+    The scheduler class takes care of the multiprocessing between reading the
+    input, calculating on the GPU, and writing the output. It acts as the 
+    manager of an assembly line to make sure parts are processed in the correct
+    order and no action is taken unless it is prompted to in order to produce 
+    the correct product.
     \subsection{Loader}
     This loader class reads the data from a given input and passes it into a
     pipe object. The input can come in as GEOtiff \(.tif\) or an ASCII \(.asc\)
@@ -607,9 +612,22 @@ be more accessible to the GIS community.
     loaded. The header info for the data is stored for the output and the
     data it self is put into the pipe lines at a time to be worked.
     \subsection{GPU Manager}
+    The GPU manager is where the desired slope, aspect, or hillshade calculations
+    are done. This class takes the data from the pipe that the loader added and 
+    spreads out over the GPUs many cores to perform its many calculations nearly 
+    simultaniously. The results are then places into the second pipe that leads 
+    to the saver to be written on to the disk.
     \subsection{Saver}
+    The data saver class takes the results sent throguh the pipe by the GPU
+    manager and saves it to the disk. It takes the result and saves as a GEOtiff 
+    \[.tif\] file in order to conserve time and file size. 
     \subsection{QGIS Plugin}
-
+    The Qgis plugin lays out the gui for this implementation and lets our 
+    program be used from the app. the plugin loads a pop up which allows the user
+    to specify their input and where tosave their output. The user then selects 
+    the combination of slope, aspect, and/or hillsahde they want calculated as 
+    well if they want ouput loaded directly into Qgis for viewing. While the
+    program is running a loading bar is visable to update on progress.
 \section{Analysis}
 Timing our implementation for parallel slope calculation from a raster file
 against the standard serial method used in QGIS has revealed the input and
