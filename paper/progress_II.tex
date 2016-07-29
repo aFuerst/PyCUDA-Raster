@@ -620,7 +620,7 @@ be more accessible to the GIS community.
     \subsection{Saver}
     The data saver class takes the results sent throguh the pipe by the GPU
     manager and saves it to the disk. It takes the result and saves as a GEOtiff 
-    \[.tif\] file in order to conserve time and file size. 
+    \(.tif\) file in order to conserve time and file size. 
     \subsection{QGIS Plugin}
     The Qgis plugin lays out the gui for this implementation and lets our 
     program be used from the app. the plugin loads a pop up which allows the user
@@ -635,32 +635,39 @@ against the standard serial methods used in QGIS has revealed the input and
 output will be our biggest hurdle to overcome. Timing data can be seen in these
 tables.
 
-Hillshade timings
+\vspace{0.25in}
+\textbf{Hillshade timings}
+
 \begin{tabular}{ l c r }
     File Size & QGIS   & PyCUDA\\
-    25 MB     & 5 secs & 3 secs
-    200 Mb    & 15 secs & 6 secs
-    1.5 GB    & 17 mins & 6 mins
+    25 MB     & 5 secs & 3 secs\\
+    200 Mb    & 15 secs & 6 secs\\
+    1.5 GB    & 17 mins & 6 mins\\
     8 GB      & 1:30+ hrs & 45 mins
 \end {tabular}
 
-Slope breakdown
+\vspace{.25in}
+\textbf{Slope breakdown}
+
 \begin{tabular}{ l c r }
     Function & QGIS   & PyCUDA\\
-    Input    & 2:30 & 6:00
-    Computation  & 6:00 & 3:48
-    Output    & 5:00 & 2:15
+    Input    & 2:30 & 6:00\\
+    Computation  & 6:00 & 3:48\\
+    Output    & 5:00 & 2:15\\
     Total   & 14:00 & 6:10
 \end {tabular}
 
-Hillshade breakdown
+\vspace{.25in}
+\textbf{Hillshade breakdown}
+
 \begin{tabular}{ l c r }
     Function & QGIS   & PyCUDA\\
-    Input    & 2:30 & 6:00
-    Computation  & 9:00 & 3:48
-    Output    & 5:00 & 2:15
+    Input    & 2:30 & 6:00\\
+    Computation  & 9:00 & 3:48\\
+    Output    & 5:00 & 2:15\\
     Total   & 17:00 & 6:10
 \end {tabular}
+\vspace{0.25in}
 
 The PyCUDA version is consistently faster than QGIS when calculating hllshade for files
 of various sizes. The I/O bottleneck  can be seen in the input and output sections 
