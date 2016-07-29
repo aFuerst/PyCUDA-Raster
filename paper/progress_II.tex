@@ -460,33 +460,33 @@ proprietary ArcGIS software. We want to progress the work of \cite{hpc_cuda} to
 be more accessible to the GIS community.
 
 \section{Problem Outline}
-\subsection{Computational Challenges}
-GIS analytics perform many independent calculations on extremely large data
-files. This proves problematic due to the memory limitations of a single
-machine, and the massive amout of calculations needed for large files. Data
-files typically analyzed by GIS can be in the terabyte (TB) size realm. With
-most computers only having memory capabilities in the gigabyte (GB) range,
-steps must be taken to work around running out of memory. Both the large size
-of files and the requirement that each piece of data be analyzed separately
-slows down processing time dramatically. Input from and output to data files
-and memory have proven to be a major component to the slow down.  However
-performing the large amount of independent calculations through serial
-programming also bogs down the process. Our goal is to build a system that
-maximizes Input/Output (I/O) throughput as well as reduce computation time
-through parallelism.
+    \subsection{Computational Challenges}
+    GIS analytics perform many independent calculations on extremely large data
+    files. This proves problematic due to the memory limitations of a single
+    machine, and the massive amout of calculations needed for large files. Data
+    files typically analyzed by GIS can be in the terabyte (TB) size realm. With
+    most computers only having memory capabilities in the gigabyte (GB) range,
+    steps must be taken to work around running out of memory. Both the large size
+    of files and the requirement that each piece of data be analyzed separately
+    slows down processing time dramatically. Input from and output to data files
+    and memory have proven to be a major component to the slow down.  However
+    performing the large amount of independent calculations through serial
+    programming also bogs down the process. Our goal is to build a system that
+    maximizes Input/Output (I/O) throughput as well as reduce computation time
+    through parallelism.
 
-\subsection{Ease of Use}
-Use of parallelism in GIS has been explored in the past, yet despite its proven
-benefits over serial calculation, the GIS community has been slow to adopt
-parallel computation. This is largely because the introduction of parallelism
-makes code much more difficult to read and write. Parallelism is something that
-many experienced programmers struggle with, let alone the many members of the
-GIS community who have little to no experience with programming. With this in
-mind, we have tried to write the parallel processing tools presented here in a
-simple, easy to modify way without giving up the power of parallelism
-altogether.  For those who don't even want exposure to any source code, we have
-provided a plugin to the popular, open source GIS QGIS with a simple GUI that
-runs the parallel code.
+    \subsection{Ease of Use}
+    Use of parallelism in GIS has been explored in the past, yet despite its proven
+    benefits over serial calculation, the GIS community has been slow to adopt
+    parallel computation. This is largely because the introduction of parallelism
+    makes code much more difficult to read and write. Parallelism is something that
+    many experienced programmers struggle with, let alone the many members of the
+    GIS community who have little to no experience with programming. With this in
+    mind, we have tried to write the parallel processing tools presented here in a
+    simple, easy to modify way without giving up the power of parallelism
+    altogether.  For those who don't even want exposure to any source code, we have
+    provided a plugin to the popular, open source GIS QGIS with a simple GUI that
+    runs the parallel code.
 
 
 \section{Methods}
@@ -504,6 +504,20 @@ GPU and executes the kernel. This program is initialized by a simple QGIS
 plugin which hands it the input and output information. We designed all of the
 I/O components to run independent of the central algorithm so that anyone can
 write their own computation kernel.
+    \subsection{Scheduler Model}
+    %Include pic of model. Talk about work flow
+    \subsection{GPU Kernel}
+    %Describe generally algorithm used by GPU Kernel, row wise grid striding loop
+    \subsection{GIS Algorithms}
+    %Slope, aspect, hillshade, etc.
+    \subsection{QGIS Integration}
+    %Talk about GUI, and loading data directly from QGIS
+
+\section{Implementation}
+    \subsection{Loader}
+    \subsection{GPU scheduler}
+    \subsection{Saver}
+    \subsection{QGIS Plugin}
 
 \section{Analysis}
 Timing our implementation for parallel slope calculation from a raster file
