@@ -93,6 +93,7 @@ class GPUCalculator(Process):
 
         self._gpuAlloc()
 
+        # pre-compile requested kernels outside loop, only do it once this way
         compiled_kernels = []
         for function in self.functions:
             kernel = self._getKernel(function)
@@ -104,6 +105,7 @@ class GPUCalculator(Process):
             #Copy input data to GPU
             cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
             for i in range(len(compiled_kernels)):
+                # pass in compiled kernel for execution
                 self._processData(compiled_kernels[i])
                 #Get data back from GPU
                 cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)

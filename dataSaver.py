@@ -138,6 +138,7 @@ class dataSaver(Process):
         while nrows < self.totalRows:
             # get line from pipe   
             arr = [] 
+            # remaining rows < write_rows, only write in as many as are extra
             if nrows + self.write_rows >= self.totalRows:
                 for row in range(self.totalRows - nrows):
                     try:
@@ -146,20 +147,25 @@ class dataSaver(Process):
                         print "Pipe closed unexpectedly"
                         self.stop()
             else:
+                # write in as many rows as write_rows indicates
                 for row in range(self.write_rows):
                     try:
                         arr.append(self.input_pipe.recv())
                     except EOFError:
                         print "Pipe closed unexpectedly"
                         self.stop()
+            # WriteAray needs a 2D array, make sure it always gets that
             if len(arr) == 1:
                 arr = [arr]
+            # write out rows
             self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
+            # every 10 iterations expliticly write to disk, minimize calling this
             if nrows % (self.write_rows * 10) == 0:
                 self.dataset.FlushCache()
             nrows+=self.write_rows
             self.pb.step(self.write_rows)
             self.rt.update()
+        # write out remaining lines
         self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name
 

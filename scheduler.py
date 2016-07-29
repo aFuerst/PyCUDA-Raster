@@ -3,7 +3,7 @@ import dataLoader, gpuCalc, dataSaver
 import numpy as np
 
 from multiprocessing import Process, Pipe, active_children
-from time import sleep
+from time import sleep, time
 
 """
 scheduler.py
@@ -26,6 +26,7 @@ email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gu
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
 def run(inputFile, outputFiles, functions, disk_rows = 30):
+    start = time()
     # create input and output pipes    
     inputPipe = Pipe()
     outputPipes = []
@@ -60,13 +61,15 @@ def run(inputFile, outputFiles, functions, disk_rows = 30):
             print "Error encountered in GPU calculater, ending tasks"
             break
         sleep(1)    
+    total = time() - start
+    print "Total time: %d mins, %f secs" % (total / 60, total % 60)
 
 if __name__ == '__main__':
     #If run from the command line, parse arguments.
     from sys import argv
     outFiles = []
     funcs = []
-    disk_rows = 30
+    disk_rows = 30  # 30 appears to be optimal number of rows to read at a time for any file
     for i in range(2,len(argv), 2):
         outFiles.append(argv[i])
         funcs.append(argv[i+1].lower())

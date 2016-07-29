@@ -137,15 +137,18 @@ class dataLoader(Process):
     def _getLines(self):
         line_num = 0
         while line_num <= self.totalRows:
+            # no need to read more, ended exactly at EOF
             if line_num == self.totalRows:
                 return
             try:
+                # remaining rows < read_rows, only read in as many as are extra
                 if line_num + self.read_rows >= self.totalRows - 1:
                     remaining = self.totalRows - line_num
                     line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,remaining,buf_type=self.dataType)
                     f=struct.unpack(self.unpackVal*remaining, line_tup)
                     for line in range(remaining):
                         self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
+                # read in as many rows as read_rows indicates
                 else:
                     line_tup = self.open_raster_band.ReadRaster(0, line_num, self.totalCols, self.read_rows, buf_type=self.dataType)
                     f=struct.unpack(self.unpackVal*self.read_rows, line_tup)
