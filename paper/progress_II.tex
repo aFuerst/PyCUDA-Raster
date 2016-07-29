@@ -599,6 +599,11 @@ be more accessible to the GIS community.
     following sections describe the implementation of each process.
     \subsection{Scheduler}
     \subsection{Loader}
+    This loader class reads the data from a given input and passes it into a
+    pipe object. The input can come in as GEOtiff \(.tif\) or an ASCII \(.asc\)
+    format selected from the disk or from QGIS when a raster image is already 
+    loaded. The header info for the data is stored for the output and the
+    data it self is put into the pipe lines at a time to be worked.
     \subsection{GPU Manager}
     \subsection{Saver}
     \subsection{QGIS Plugin}
