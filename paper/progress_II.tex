@@ -628,23 +628,54 @@ be more accessible to the GIS community.
     the combination of slope, aspect, and/or hillsahde they want calculated as 
     well if they want ouput loaded directly into Qgis for viewing. While the
     program is running a loading bar is visable to update on progress.
+    
 \section{Analysis}
-Timing our implementation for parallel slope calculation from a raster file
-against the standard serial method used in QGIS has revealed the input and
-output will be our biggest hurdle to overcome. Testing with a 23 MB data file
-our implementation completed on average in nine seconds while the QGIS method
-finishes on average in five seconds. Moving to a 200 MB file the time
-difference increased with QGIS completing in 15 seconds and our version
-finishing in 51 seconds. While testing these files, we noticed that calculation
-time on for the PyCUDA version appears to be instantaneous after reading the
-file into memory, while calculations in QGIS are noticeably taking time to
-complete. Moving on to even larger file sizes, in the GB range, is where
-conflicts arose. While testing  a 3.1 GB file, the PyCUDA implementation completed
-in 11 minutes, only a minute slower than QGIS. A similar occurrence happened with
-a larger 8 GB file, with the PyCUDA taking 15 minutes more than QGIS. These times
-are very encouraging, showing that Python code is approaching equal times with QGIS.
-We are confident that these times can be lowered as we work to fix bugs in our
-current code base and explore options to optimize our current algorithms.
+Timing our implementation for parallel hillshade and slope calculation from a raster file
+against the standard serial methods used in QGIS has revealed the input and
+output will be our biggest hurdle to overcome. Timing data can be seen in these
+tables.
+
+Hillshade timings
+\begin{tabular}{ l c r }
+    File Size & QGIS   & PyCUDA\\
+    25 MB     & 5 secs & 3 secs
+    200 Mb    & 15 secs & 6 secs
+    1.5 GB    & 17 mins & 6 mins
+    8 GB      & 1:30+ hrs & 45 mins
+\end {tabular}
+
+Slope breakdown
+\begin{tabular}{ l c r }
+    Function & QGIS   & PyCUDA\\
+    Input    & 2:30 & 6:00
+    Computation  & 6:00 & 3:48
+    Output    & 5:00 & 2:15
+    Total   & 14:00 & 6:10
+\end {tabular}
+
+Hillshade breakdown
+\begin{tabular}{ l c r }
+    Function & QGIS   & PyCUDA\\
+    Input    & 2:30 & 6:00
+    Computation  & 9:00 & 3:48
+    Output    & 5:00 & 2:15
+    Total   & 17:00 & 6:10
+\end {tabular}
+
+The PyCUDA version is consistently faster than QGIS when calculating hllshade for files
+of various sizes. The I/O bottleneck  can be seen in the input and output sections 
+of the second table. PyCUDA spends as much time dealing with disk as QGIS does which
+limits the possible speedup from using the GPU. Output is slightly fast thanks to compression
+done by GDAL. This speed increase is still significant however. GPU computations, 
+including CPU based memory management and took one third of the time 
+required to do the same thing in QGIS. While not shown in the tables, the total time 
+just on the GPU to compute hillshade for an 8 GB file is incredibly small.
+Including moving data to and from the card, the accumulated execution took less 
+than 2 seconds.  A processs that required hundreds or thousands
+of computations per element would be perfect for adaptation onto GPU processing.
+Both slope and hillshade are calculated in the same time by the GPU, showing that 
+it isn't being taxed by the more complicated formula and could easily do more work.
+
 
 \section{Conclusion}
 We have developed a PyCUDA based, open source raster calculation tool that can
