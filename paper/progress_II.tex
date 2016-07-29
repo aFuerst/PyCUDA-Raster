@@ -505,7 +505,7 @@ be more accessible to the GIS community.
     compounding the problem is that GPU memory is typically more limited than
     main memory, so multiple copies from main memory are required for files
     larger than the available memory on the GPU. Thus we have designed our
-    workflow to try to mitigate the effects of the I/O bottleneck.
+    work flow to try to mitigate the effects of the I/O bottleneck.
 
     Figure \ref{model} shows our design model. There are three main processes,
     the data loader, the data saver, and GPU manager. Broadly, the data loader
@@ -515,7 +515,7 @@ be more accessible to the GIS community.
     including copying data to and back from the GPU. The three processes are
     described in more detail in section \ref{implementation}. The three
     processes run independently, so data can be loaded from disk, calculations
-    can be perfromed on the GPU, and data can be saved to disk all
+    can be performed on the GPU, and data can be saved to disk all
     simultaneously.  This provides parallelism both on the CPU for I/O, and on
     the GPU for calculations, improving overall computation time.
     
@@ -531,9 +531,34 @@ be more accessible to the GIS community.
     \subsection{GIS Algorithms}
     %Slope, aspect, hillshade, etc.
     \subsection{QGIS Integration}
-    %Talk about GUI, and loading data directly from QGIS
+    \begin{figure}
+        \includegraphics[width=\linewidth]{gui.png}
+        \caption{Snapshot of plugin GUI.}
+        \label{gui}
+    \end{figure}
+    We have constructed a QGIS plugin, depicted in figure \ref{gui} which uses
+    our data processing pipeline and presents a simple GUI where a user can
+    select an input file, output file, and operations to perform. This way,
+    once the plugin is installed, a user need not even interact with the
+    command line, or learn to use a new piece of software in order to perform
+    GPU calculations. We have also tried to allow users to load data directly
+    from QGIS rather than from disk, but this software is still buggy.
 
 \section{Implementation} \label{implementation}
+    Our program is implemented primarily in Python 2.7. We chose to write the
+    program in Python because it is easier to read, write, and produces
+    shorter, more compact code than the C or C++ typically used with CUDA.
+    Although Python is slower than C or C++, we thought the readability
+    trade-off was worth it so that others in the GIS community could read,
+    test, and modify our code. In order to still get as much efficiency as
+    possible, we used the GDAL libraries, Numpy, and PyCUDA \cite{pycuda_1}
+    \cite{pycuda_2}. PyCUDA serves as a wrapper for CUDA C that handles many of
+    the ugly details of memory allocation and transfer to the GPU.
+    Unfortunately, kernel code to be executed on the GPU must still be written
+    in C. 
+    
+    Our program's structure follows the model in figure \ref{model}. The
+    following sections describe the implementation of process.
     \subsection{Loader}
     \subsection{GPU Manager}
     \subsection{Saver}
