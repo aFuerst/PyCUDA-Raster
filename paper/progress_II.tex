@@ -530,6 +530,50 @@ be more accessible to the GIS community.
     efficiency\cite{grid_stride}.
     \subsection{GIS Algorithms}
     %Slope, aspect, hillshade, etc.
+    The algoirthms we are implementing utilize a 3x3 cell neighborhood around each 
+    calculated cell. 
+    \begin{figure}
+        \includegraphics[width=\linewidth]{GIS grid.gif}
+        \caption{3x3 cell neighborhood}
+        \label{GIS grid}
+    \end{figure}
+    This 3x3 grid is used to calculate the rate of change from east to west \(dz/dx\)
+    and the rate of change from north to south \(dz/dy\). These are found as follows:
+    \[dz/dx = ((c + 2f + i) - (a + 2d + g) / (8 * x_cellsize)\]
+    \[dz/dy = ((g + 2h + i) - (a + 2b + c)) / ( 8 * y_cellsize)\]
+    With these rates of change now found they can be used to calculate slope, aspect
+    and hillshade. Slope is the maximum rate of change in elevation between the cell and its
+    neighbors.The lower the slope value the flatter the land is.It is calculated with 
+    the following formula:
+    \[Slope = ATAN(\sqrt{dz/dx^{2} + dz/dy^{2}})\]
+    Aspect relates to slope to identify the direction of the downslope. Aspect is found  
+    using conditional steps and in calculated in degrees before converted to radians.
+    if dz/dx or dz/dy = a no data value
+    \[Aspect = no data value\]
+    \[Aspect = 57.29578 * ATAN2(dz/dy, -dz/dx)\]
+     if Aspect \> 90.0
+    \[Aspect = 360.0 - Aspect + 90.0\]
+    else 
+    \[Aspect = 90.0 - Aspect\]
+    then covert to radians
+    \[Aspect = Aspect * (Pi / 180.0)\]
+    Hillshade is the hypothetical illumination of the surface when the sun is at a 
+    specific height and angle in the sky. It is a more complex algorithm and relies
+    on slope and aspect being calculated in addition to finding the illumination 
+    angle \(zenith\) and illumination direction \(azimuth\). This is done by:
+    \[Zenith = 90.0 - sun's altitide\]
+    then convert Zenith to radians
+    \[Zenith = Zenith * (Pi / 180.0)\]
+    \[Azimuth = angle of the sun\]
+    \[Azimuth = 360.0 - Azimuth + 90.0\]
+    if the Azimuth \>= 360.0
+    \[Azimuth = Azimuth - 360.0\]
+    then convert Azimuth to radians
+    \[Azimuth = Azimuth * (Pi / 180.0)\]
+    Now Hillshade can be calculated using Zenith Azimuth and the slope and aspect for
+    this cell
+    \[Hillshade = 255.0 ((COS(Zenith) * COS(Slope)) + (SIN(Zenith) * SIN(Slope) * COS(Azimuth - Aspect))\]
+    These are how we were able to caluclate these GIS analyitics.
     \subsection{QGIS Integration}
     %Talk about GUI, and loading data directly from QGIS
 
