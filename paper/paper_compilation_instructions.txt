@@ -1,0 +1,4 @@
+pdflatex paper.tex
+bibtex paper.tex
+pdflatex paper.tex
+pdflatex paper.tex
