@@ -386,10 +386,10 @@
 \begin{abstract}
     Geographic Information Systems (GIS) are used to in many different fields
     to analyze spatial data and plan accordingly. Geographic data has been
-    growing in size in exponentially, and while some GIS tools to analyze this
+    growing in size exponentially, and while some GIS tools to analyze this
     data have been created, usage and efficiency have been lagging behind. The
     advent of massively parallel computing, specifically the availability of
-    GPUs programming, have made a more efficient solution possible since most
+    GPU programming, have made a more efficient solution possible since most
     GIS calculations are embarrassingly parallel. QGIS is an open source GIS
     platform that has gained much traction in the computational geography
     community. We are creating a QGIS plugin that leverages GPUs to increase
@@ -439,11 +439,11 @@ Systems (GIS) are embarrassingly parallelizable, parallel computing has yet to
 be largely adopted in the community. We're developing open source software for
 parallel raster calculations to spur the GIS community to adopt parallel
 computing practices. This plugin was built for the popular, open source GIS
-software QGIS, that performs parallel slope calculations on an arbitrary raster
-file.  We've implemented the plugin using Python and PyCUDA, an open source
-library for Python built on top of the CUDA programming language for
-\textsc{NVIDIA} graphics cards. Our current results indicate a efficient,
-scalable improvement over similar serial calculations
+software QGIS, that performs parallel slope, aspect and/or hillshade calculations 
+on an arbitrary raster file.  We've implemented the plugin using Python and 
+PyCUDA, an open source library for Python built on top of the CUDA programming
+language for \textsc{NVIDIA} graphics cards. Our current results indicate a 
+efficient, scalable improvement over similar serial calculations.
 
 \section{Related Work}
 The idea of using parallel processing in GIS had been around for a long time
@@ -462,13 +462,13 @@ be more accessible to the GIS community.
 \section{Problem Outline}
     \subsection{Computational Challenges}
     GIS analytics perform many independent calculations on extremely large data
-    files. This proves problematic due to the memory limitations of a single
-    machine, and the massive amout of calculations needed for large files. Data
-    files typically analyzed by GIS can be in the terabyte (TB) size realm. With
+    sets. This proves problematic due to the memory limitations of a single
+    machine, and the massive amount of calculations needed to run. Data sets 
+    typically analyzed by GIS can be in the terabyte (TB) size realm. With
     most computers only having memory capabilities in the gigabyte (GB) range,
     steps must be taken to work around running out of memory. Both the large size
-    of files and the requirement that each piece of data be analyzed separately
-    slows down processing time dramatically. Input from and output to data files
+    of data sets and the requirement that each piece of data be analyzed separately
+    slows down processing time dramatically. Input from and output to data sets
     and memory have proven to be a major component to the slow down.  However
     performing the large amount of independent calculations through serial
     programming also bogs down the process. Our goal is to build a system that
