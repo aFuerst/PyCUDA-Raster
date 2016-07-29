@@ -43,6 +43,7 @@
 
 \documentclass[journal]{IEEEtran}
 %
+\usepackage{amsmath}
 % If IEEEtran.cls has not been installed into the LaTeX system files,
 % manually specify the path to it like:
 % \documentclass[journal]{../sty/IEEEtran}
@@ -377,6 +378,7 @@
 % use for special paper notices
 %\IEEEspecialpapernotice{(Invited Paper)}
 
+% For align
 
 % make the title area
 \maketitle
@@ -528,52 +530,44 @@ be more accessible to the GIS community.
     that all of the correct data is available on any given thread for a 3x3
     grid calculation. The kernel uses a grid striding loop for flexibility and
     efficiency\cite{grid_stride}.
+
     \subsection{GIS Algorithms}
-    %Slope, aspect, hillshade, etc.
     The algoirthms we are implementing utilize a 3x3 cell neighborhood around each 
     calculated cell. 
     \begin{figure}
-        \includegraphics[width=\linewidth]{GIS grid.gif}
+        \center
+        \includegraphics[width=2in]{GISgrid.jpg}
         \caption{3x3 cell neighborhood}
         \label{GIS grid}
     \end{figure}
-    This 3x3 grid is used to calculate the rate of change from east to west \(dz/dx\)
-    and the rate of change from north to south \(dz/dy\). These are found as follows:
-    \[dz/dx = ((c + 2f + i) - (a + 2d + g) / (8 * x_cellsize)\]
-    \[dz/dy = ((g + 2h + i) - (a + 2b + c)) / ( 8 * y_cellsize)\]
-    With these rates of change now found they can be used to calculate slope, aspect
-    and hillshade. Slope is the maximum rate of change in elevation between the cell and its
-    neighbors.The lower the slope value the flatter the land is.It is calculated with 
-    the following formula:
-    \[Slope = ATAN(\sqrt{dz/dx^{2} + dz/dy^{2}})\]
-    Aspect relates to slope to identify the direction of the downslope. Aspect is found  
-    using conditional steps and in calculated in degrees before converted to radians.
-    if dz/dx or dz/dy = a no data value
-    \[Aspect = no data value\]
-    \[Aspect = 57.29578 * ATAN2(dz/dy, -dz/dx)\]
-     if Aspect \> 90.0
-    \[Aspect = 360.0 - Aspect + 90.0\]
-    else 
-    \[Aspect = 90.0 - Aspect\]
-    then covert to radians
-    \[Aspect = Aspect * (Pi / 180.0)\]
-    Hillshade is the hypothetical illumination of the surface when the sun is at a 
-    specific height and angle in the sky. It is a more complex algorithm and relies
-    on slope and aspect being calculated in addition to finding the illumination 
-    angle \(zenith\) and illumination direction \(azimuth\). This is done by:
-    \[Zenith = 90.0 - sun's altitide\]
-    then convert Zenith to radians
-    \[Zenith = Zenith * (Pi / 180.0)\]
-    \[Azimuth = angle of the sun\]
-    \[Azimuth = 360.0 - Azimuth + 90.0\]
-    if the Azimuth \>= 360.0
-    \[Azimuth = Azimuth - 360.0\]
-    then convert Azimuth to radians
-    \[Azimuth = Azimuth * (Pi / 180.0)\]
-    Now Hillshade can be calculated using Zenith Azimuth and the slope and aspect for
-    this cell
-    \[Hillshade = 255.0 ((COS(Zenith) * COS(Slope)) + (SIN(Zenith) * SIN(Slope) * COS(Azimuth - Aspect))\]
-    These are how we were able to caluclate these GIS analyitics.
+    This 3x3 grid is used to calculate the rate of change from east to west
+    \(\frac{dz}{dx}\) and the rate of change from north to south
+    \(\frac{dz}{dy}\). These are found as follows:
+    \[\frac{dz}{dx} = ((c + 2f + i) - (a + 2d + g) / (8 * x\_cellsize)\]
+    \[\frac{dz}{dy} = ((g + 2h + i) - (a + 2b + c)) / ( 8 * y\_cellsize)\]
+    With these rates of change now found they can be used to calculate slope,
+    aspect and hillshade. Slope is the maximum rate of change in elevation
+    between the cell and its neighbors.The lower the slope value the flatter
+    the land is. It is calculated with the following formula:
+    \[Slope = ATAN\Bigg(\sqrt{\Big(\frac{dz}{dx}\Big)^{2} + \Big(\frac{dz}{dy}\Big)^{2}}~\Bigg)\]
+    Aspect relates to slope to identify the direction of the downslope. Aspect
+    is found  using conditional steps and is calculated in degrees, which can
+    be converted to radians.
+    %If \(\frac{dz}{dx}\) or \(\frac{dz}{dy}\) equals a no data value
+    %\[Aspect = no data value\]
+    \[Aspect = 57.29578 * ATAN2\bigg(\frac{dz}{dy}, -\frac{dz}{dx}\bigg)\]
+    Hillshade is the hypothetical illumination of the surface when the sun is
+    at a specific height and angle in the sky. It is a more complex algorithm
+    and relies on slope and aspect being calculated in addition to finding the
+    illumination angle zenith (abbreviated \(zen\) and illumination
+    direction azimuth (abbreviated \(azm\). We have defaulted these values
+    to 45 degrees and 315 degrees respectively.
+    \begin{align*}
+        Hillshade =& ~ 255.0 ((COS(zen) * COS(slope)) ~ +  \\
+                   &(SIN(zen) * SIN(slope) * COS(azm - aspect))
+    \end{align*}
+    %\[Hillshade = 255.0 ((COS(Zenith) * COS(Slope)) +  (SIN(Zenith) * SIN(Slope) * COS(Azimuth - Aspect))\]
+
     \subsection{QGIS Integration}
     \begin{figure}
         \includegraphics[width=\linewidth]{gui.png}
@@ -586,23 +580,24 @@ be more accessible to the GIS community.
     once the plugin is installed, a user need not even interact with the
     command line, or learn to use a new piece of software in order to perform
     GPU calculations. We have also tried to allow users to load data directly
-    from QGIS rather than from disk, but this software is still buggy.
+    from QGIS rather than from disk, but this software is still unstable.
 
 \section{Implementation} \label{implementation}
     Our program is implemented primarily in Python 2.7. We chose to write the
-    program in Python because it is easier to read, write, and produces
-    shorter, more compact code than the C or C++ typically used with CUDA.
-    Although Python is slower than C or C++, we thought the readability
-    trade-off was worth it so that others in the GIS community could read,
-    test, and modify our code. In order to still get as much efficiency as
-    possible, we used the GDAL libraries, Numpy, and PyCUDA \cite{pycuda_1}
-    \cite{pycuda_2}. PyCUDA serves as a wrapper for CUDA C that handles many of
-    the ugly details of memory allocation and transfer to the GPU.
-    Unfortunately, kernel code to be executed on the GPU must still be written
-    in C. 
+    program in Python because it is relatively easy to read and write, and also
+    allowed us to produce shorter, more compact code than the C or C++ code
+    typically used with CUDA.  Although Python is slower than C or C++, we
+    thought the readability trade-off was worth it so that others in the GIS
+    community could read, test, and modify our code. In order to still get as
+    much efficiency as possible, we used the GDAL libraries, Numpy, and PyCUDA
+    \cite{pycuda_1} \cite{pycuda_2}. PyCUDA serves as a wrapper for CUDA C that
+    handles many of the ugly details of memory allocation and transfer to the
+    GPU.  Unfortunately, kernel code to be executed on the GPU must still be
+    written in C. 
     
     Our program's structure follows the model in figure \ref{model}. The
-    following sections describe the implementation of process.
+    following sections describe the implementation of each process.
+    \subsection{Scheduler}
     \subsection{Loader}
     \subsection{GPU Manager}
     \subsection{Saver}
