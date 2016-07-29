@@ -445,7 +445,7 @@ PyCUDA, an open source library for Python built on top of the CUDA programming
 language for \textsc{NVIDIA} graphics cards. Our current results indicate a 
 efficient, scalable improvement over similar serial calculations.
 
-\section{Related Work}
+\section{Related Work} \label{related}
 The idea of using parallel processing in GIS had been around for a long time
 \cite{healy}, but only recently has been seriously considered.  Similar work on
 creating open source, accessible parallel GIS tools has been done in the past,
@@ -459,7 +459,7 @@ library for simple raster calculations using CUDA as an extension to the
 proprietary ArcGIS software. We want to progress the work of \cite{hpc_cuda} to
 be more accessible to the GIS community.
 
-\section{Problem Outline}
+\section{Problem Outline} \label{problem}
     \subsection{Computational Challenges}
     GIS analytics perform many independent calculations on extremely large data
     sets. This proves problematic due to the memory limitations of a single
@@ -489,29 +489,13 @@ be more accessible to the GIS community.
     runs the parallel code.
 
 
-\section{Methods}
-Our implementation of this plugin utilizes parallelism on both GPUs and
-multi-core CPUs. It contains a kernel written in CUDA C that the CUDA compiler
-executes in order to perform calculations on the  GPU. This kernel can be
-executed by thousands of CUDA threads each tasked with calculating a certain
-number of pixels. This is surrounded by Python code that performs the needed
-set up and removal of data. This Python / PyCUDA code is itself running in a
-multi-threaded environment to limit time lost waiting for data to be produced
-from memory. There are three threads running which comprise the whole program.
-Two are dedicated to reading and writing data to the disk as this is the
-slowest portion of the whole program. The third moves the data to and from the
-GPU and executes the kernel. This program is initialized by a simple QGIS
-plugin which hands it the input and output information. We designed all of the
-I/O components to run independent of the central algorithm so that anyone can
-write their own computation kernel.
-
-    \subsection{Scheduler Model}
-    %Include pic of model. Talk about work flow
+\section{Methods} \label{methods}
     \begin{figure}
         \includegraphics[width=\linewidth]{model.png}
         \caption{Main work flow model.}
         \label{model}
     \end{figure}
+    \subsection{Scheduler Model}
     The previous work done in \cite{hpc_cuda} revealed that the greatest
     hindrance to performance in GPU based GIS calculations is the transfer of
     data from disk to main memory, and then from main memory to GPU memory.
@@ -523,17 +507,35 @@ write their own computation kernel.
     larger than the available memory on the GPU. Thus we have designed our
     workflow to try to mitigate the effects of the I/O bottleneck.
 
-
+    Figure \ref{model} shows our design model. There are three main processes,
+    the data loader, the data saver, and GPU manager. Broadly, the data loader
+    is responsible for loading data from disk and formatting from its initial
+    file type, the data saver is responsible for compressing and saving data
+    back to disk, and the GPU manager is responsible for running GPU tasks,
+    including copying data to and back from the GPU. The three processes are
+    described in more detail in section \ref{implementation}. The three
+    processes run independently, so data can be loaded from disk, calculations
+    can be perfromed on the GPU, and data can be saved to disk all
+    simultaneously.  This provides parallelism both on the CPU for I/O, and on
+    the GPU for calculations, improving overall computation time.
+    
     \subsection{GPU Kernel}
-    %Describe generally algorithm used by GPU Kernel, row wise grid striding loop
+    The GPU kernel is designed to perform analysis on individual cells in a
+    raster file based on a 3x3 grid around the cell. The kernel was designed to
+    be modular so that any kind of calculation can be done based on the 3x3
+    grid of neighbors. A user simply needs to write the desired calculation,
+    and the rest of the kernel was written to fetch the correct data, ensuring
+    that all of the correct data is available on any given thread for a 3x3
+    grid calculation. The kernel uses a grid striding loop for flexibility and
+    efficiency\cite{grid_stride}.
     \subsection{GIS Algorithms}
     %Slope, aspect, hillshade, etc.
     \subsection{QGIS Integration}
     %Talk about GUI, and loading data directly from QGIS
 
-\section{Implementation}
+\section{Implementation} \label{implementation}
     \subsection{Loader}
-    \subsection{GPU scheduler}
+    \subsection{GPU Manager}
     \subsection{Saver}
     \subsection{QGIS Plugin}
 
