@@ -629,24 +629,47 @@ We are confident that these times can be lowered as we work to fix bugs in our
 current code base and explore options to optimize our current algorithms.
 
 \section{Conclusion}
-We have developed a PyCUDA based, open source raster calculation plugin for
-QGIS. The plugin ensures that neither memory on the host device or GPU will be
-overpopulated, and utilizes multithreading so that I/O and GPU computation can
-occur simultaneously. Our initial results indicate that our implementation
-competes closely with the standard serial C++ implementation of raster
-algorithms used by QGIS on small files, and may surpass it on large files.  It
-is our hope that since QGIS is a popular freeware GIS, that our plugin will be
-widely adopted and modified by the community to fit various specific needs.
+We have developed a PyCUDA based, open source raster calculation tool that can
+run either from the command line or as a plugin for QGIS. The plugin ensures
+that neither memory on the host device or GPU will be overpopulated, and
+utilizes multithreading so that I/O and GPU computation can occur
+simultaneously. The underlying code was written to be easy to read and modify
+so that others can easily use it, read it, learn from it, and modify it. File
+I/O is encapsulated separately from GPU calculations so that the I/O model is
+easy to understand and modify. By default, our tool can perform slope, aspect,
+and hillshade calculations. Our results show that our raster calculation
+implementations 2-3x faster than the serial ones typically used by QGIS, and
+that the performance gap widens for larger files and more complex calculations.
+The greatest bottleneck in our program is data I/O transfer between the disk,
+main memory, and GPU memory, as even for files in the tens of GB, GPU
+calculations take only a handful of seconds.  Hence, anyone who designs a more
+complex function to run with our kernel can expect to see even greater time
+savings over a serial implementation. Additionally, we designed a simple to use
+GUI for the plugin so that even those with no coding experience can still use
+the tool.
 
 \section{Future Work}
-Our primary goal is to fully develop the plugin and publish it to QGIS so
-members of the community can start to use it and customize it for themselves.
-Secondly, the plugin only supports calculating slope and accepts input and
-output in the form of ESRI ascii format. This represents a problem as this
-format requires significantly more disk space for storage. We hope to expand
-this support to GEOTIFF files or another common format. Additionally, our file
-I/O currently only uses some bare-bones optimizations. We would like to
-investigate different I/O schemes to see what is optimal.
+Many more GIS problems could be analyzed using massively parallel GPU
+computation.  Our tool only allows for independent raster computations based on
+a 3x3 grid around a given cell, however, with relatively little change, this
+could be extended to larger grids, like 5x5 or greater.  The GPU could also be
+used to different kinds of computation altogether with multiple kernels, such
+as analysis on raster data where each computation may have depenency on
+another, or even analysis on vector data.
+
+The plugin currently has minimal integration with QGIS. Aside from being able
+to load data using the QGIS API, the plugin is just a wrapper for the tool
+that reads from and writes to disk. Further integration with QGIS could improve
+both performance and usability of the plugin.
+
+Currently, the slowest part of the computations by and far is file I/O. Further
+optimizing I/O and exploring new I/O methods and/or models could significantly
+improve run time. While our model supports asynchronous I/O and computation to
+some extent, in reality the vast majority of the time the GPU isn't utilized
+while it is waiting for data to be loaded. However, using faster methods to
+improve I/O may lead to more complex code that is both more difficult to read,
+write, debug, and modify, so this trade off must be considered if one desires
+their code to be easily usable in the open source community.
 
 % Can use something like this to put references on a page
 % by themselves when using endfloat and the captionsoff option.
