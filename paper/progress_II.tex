@@ -550,12 +550,14 @@ be more accessible to the GIS community.
     between the cell and its neighbors.The lower the slope value the flatter
     the land is. It is calculated with the following formula:
     \[Slope = ATAN\Bigg(\sqrt{\Big(\frac{dz}{dx}\Big)^{2} + \Big(\frac{dz}{dy}\Big)^{2}}~\Bigg)\]
+
     Aspect relates to slope to identify the direction of the downslope. Aspect
     is found  using conditional steps and is calculated in degrees, which can
     be converted to radians.
     %If \(\frac{dz}{dx}\) or \(\frac{dz}{dy}\) equals a no data value
     %\[Aspect = no data value\]
     \[Aspect = 57.29578 * ATAN2\bigg(\frac{dz}{dy}, -\frac{dz}{dx}\bigg)\]
+
     Hillshade is the hypothetical illumination of the surface when the sun is
     at a specific height and angle in the sky. It is a more complex algorithm
     and relies on slope and aspect being calculated in addition to finding the
@@ -569,11 +571,6 @@ be more accessible to the GIS community.
     %\[Hillshade = 255.0 ((COS(Zenith) * COS(Slope)) +  (SIN(Zenith) * SIN(Slope) * COS(Azimuth - Aspect))\]
 
     \subsection{QGIS Integration}
-    \begin{figure}
-        \includegraphics[width=\linewidth]{gui.png}
-        \caption{Snapshot of plugin GUI.}
-        \label{gui}
-    \end{figure}
     We have constructed a QGIS plugin, depicted in figure \ref{gui} which uses
     our data processing pipeline and presents a simple GUI where a user can
     select an input file, output file, and operations to perform. This way,
@@ -581,6 +578,11 @@ be more accessible to the GIS community.
     command line, or learn to use a new piece of software in order to perform
     GPU calculations. We have also tried to allow users to load data directly
     from QGIS rather than from disk, but this software is still unstable.
+    \begin{figure}
+        \includegraphics[width=\linewidth]{gui.png}
+        \caption{Snapshot of plugin GUI.}
+        \label{gui}
+    \end{figure}
 
 \section{Implementation} \label{implementation}
     Our program is implemented primarily in Python 2.7. We chose to write the
