@@ -1,0 +1,47 @@
+Windows:
+
+1) Install Python 2.7.12 from here:
+    https://www.python.org/downloads/
+    Add "C:\Python27;" and "C:\Python27\Scripts;" to your system PATH variable
+
+    If you have multiple installations of Python on your machine you must ensure
+    to place these two at the front / top of your PATH.
+    You MUST install the 64 bit version of Python or the program will NOT work. 
+
+2) Install Visual Studio 2013 Community Edition
+    https://www.visualstudio.com/en-us/news/vs2013-community-vs.aspx
+    Add these 3 lines to system PATH
+    "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin;"
+    "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64;"
+    "C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE;"
+
+You will have to close and re-open any command prompt windows you have open to be able to 
+do later Python library installations.
+
+3) Install CUDA
+    https://developer.nvidia.com/cuda-downloads/
+
+4) Install Numpy
+    http://www.numpy.org/
+    or run "pip install numpy" in command prompt
+
+5) Install Boost
+    Install intsructions are located here:
+    http://www.boost.org/doc/libs/1_61_0/more/getting_started/windows.html
+
+6) Install Boost.Python
+    http://www.lfd.uci.edu/~gohlke/pythonlibs/#boost.python
+    Select the one titled "boost_python-1.59-cp27-none-win_amd64.whl"
+    Install it using "pip install boost_python-1.59-cp27-none-win_amd64.whl"
+
+7) Install Python GDAl
+    http://www.lfd.uci.edu/~gohlke/pythonlibs/#gdal
+    Select the one titled "GDAL-2.0.3-cp27-cp27m-win_amd64.whl"
+    Install using "pip install GDAL-2.0.3-cp27-cp27m-win_amd64.whl"
+
+8) Install PyCUDA
+    This is a list of PyCUDA binaries:
+    http://www.lfd.uci.edu/~gohlke/pythonlibs/#pycuda
+    Select the one titled "pycuda-2016.1.2+cuda7518-cp27-cp27m-win_amd64.whl"
+    Navigate to your downloads folder in command prompt and run "pip install pycuda-2016.1.2+cuda7518-cp27-cp27m-win_amd64.whl"
+
