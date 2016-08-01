@@ -1,4 +1,4 @@
-Windows:
+Windows (No QGIS):
 
 1) Install Python 2.7.12 from here:
     https://www.python.org/downloads/
@@ -45,3 +45,81 @@ do later Python library installations.
     Select the one titled "pycuda-2016.1.2+cuda7518-cp27-cp27m-win_amd64.whl"
     Navigate to your downloads folder in command prompt and run "pip install pycuda-2016.1.2+cuda7518-cp27-cp27m-win_amd64.whl"
 
+9) This allows the program to be run from the command line. To enable the QGIS
+    plugin to work, the same changes must be made to the Python installation
+    that QGIS uses, "C:\Program files\QGIS 2.14.x\apps\Python27" (this is untested). 
+
+##################################################################################
+
+Debian (Ubunutu, Mint, ...) based systems:
+
+1. Make sure Python 2.7 is installed, it probably is by default. QGIS wouldn't
+build without a Python installation, so you likely have it.
+
+------------------------------------------------------------------------------
+
+2. Make sure Numpy is installed. This is a QGIS dependency, so it should
+already be installed. To make sure Numpy is installed, open the Python
+interpreter or write a Python script and type "import numpy". If this fails,
+you will need to install Numpy. On Ubuntu you can do this on Ubuntu by using
+the following command on the command line.
+    sudo apt-get install python-numpy 
+Or, you can use pip which is included with Python. 
+    pip install numpy
+
+------------------------------------------------------------------------------
+
+3. Make sure GDAL for Python is installed. This is another QGIS dependency, so
+it should already be installed if you have QGIS.  To check if GDAL is
+installed, open the Python interpreter or write a Python script and type
+"import osgeo". If this fails, you will need to install GDAL.  You can do this
+on Ubuntu through
+    sudo apt-get install python-gdal
+or, you can download and install GDAL directly. You will need to build GDAL,
+and then build the python library on top of it.
+    http://www.gdal.org/   
+    https://pypi.python.org/pypi/GDAL/
+
+------------------------------------------------------------------------------
+
+4. You will need a compatible NVIDIA driver for your version of Linux, as
+well as CUDA 6.0 or greater. Detailed instructions on downloading and
+installing CUDA can be found here
+    http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux/index.html
+
+------------------------------------------------------------------------------
+
+5. For PyCUDA to be able to interact with CUDA properly, Boost.Python, part of
+Boost C++ libraries must be installed. If Boost isn't already installed, on
+Ubuntu you can use
+    sudo apt-get install libboost-all-dev
+or download and install directly from the boost website.
+    http://www.boost.org/
+
+------------------------------------------------------------------------------
+
+6. Finally, install PyCUDA. The most reliable way to install PyCUDA is to
+download it from the Python Package Index and install it by following the
+instructions in README_SETUP.txt inside unpackaged folder.
+    https://pypi.python.org/pypi/pycuda
+Or you can try to install it using pip
+    pip install pycuda
+
+------------------------------------------------------------------------------
+
+7. In order for PyCUDA to recognize the CUDA installation, you many need to
+change some path variables. Edit your .bashrc file (usually located in
+/home/username/) and add the following lines
+
+export PATH=$PATH:/path/to/cuda/bin
+export LD_LIBRARY_PATH=/path/to/cuda/lib64
+
+"/path/to/cuda" should be wherever you have your CUDA installation from step 4.
+For me that is "/usr/local/cuda-7.0". Once you're done editing the .bashrc file,
+run the command "source .bashrc" to update the changes.
+
+------------------------------------------------------------------------------
+
+8. You should now be able to run the plugin from the command line. In order for
+QGIS to properly recognize all of the changes, you may need to restart your
+computer.
