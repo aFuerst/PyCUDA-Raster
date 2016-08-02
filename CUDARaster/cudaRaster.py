@@ -226,29 +226,30 @@ class CUDARaster:
             selected_index = self.dlg.input_layer_box.currentIndex()
             print "layer index: ", selected_index
 
+            # Check if layer selected for input
+            # If os.name is posix, file structure uses forward slashes. Otherwise,
+            # in Windows use back slashes.
             if selected_index != 0:
                 input_file = self.layers[selected_index-1]
                 input_file_name = input_file.name()
                 print "file name: ", input_file_name
                 if name == 'posix':
-                    #input_file = input_file[input_file.rfind('/')+1:]
                     input_file_name = "/" + input_file_name
                 else:
                     input_file_name = "\\" + input_file_name
 
+            # If no layer already in QGIS was selected, check input from disk.
             else:
                 input_file = self.dlg.input_line.text()
                 if input_file == "":
                     print "NO OPTION SELECTED!"
                     return
          
-                #TODO: Check if this works on windows
                 if name == 'posix':
-                    #input_file = input_file[input_file.rfind('/')+1:]
                     input_file_name = input_file[input_file.rfind('/')+1:]
                     input_file_name = "/" + input_file_name[:-4]
                 else:
-                    input_file = input_file[input_file.rfind('\\')+1:]
+                    input_file_name = input_file[input_file.rfind('\\')+1:]
                     input_file_name = "\\" + input_file_name[:-4]
 
                 print "file name: ", input_file_name
@@ -266,8 +267,10 @@ class CUDARaster:
                              + input_file_name\
                              + "_" + function + ".tif") 
 
+            # Run main code
             scheduler.run(input_file, outputs, functions)
 
+            # Load layer back into QGIS if requested
             if self.dlg.slope_check.isChecked() and self.dlg.qgis_slope_check.isChecked():
                 for string in outputs:
                     if "_slope" in string:

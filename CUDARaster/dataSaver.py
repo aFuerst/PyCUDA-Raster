@@ -67,7 +67,7 @@ class dataSaver(Process):
     def log(self, message):
         self.logfile.write(str(message) + '\n')
         print str(message)
-        self.logfile.flush()
+        #self.logfile.flush()
 
     def __del__(self):
         pass
@@ -116,6 +116,7 @@ class dataSaver(Process):
         self.log("Stopping saver " + self.file_name  +" ...")
         self._closeFile()
         self.input_pipe.close()
+        self.logfile.flush()
         exit(1)
 
     """
@@ -174,4 +175,5 @@ class dataSaver(Process):
             self.rt.update()
         self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name
+        self.logfile.flush()
 

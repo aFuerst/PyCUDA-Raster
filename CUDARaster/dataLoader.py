@@ -55,7 +55,7 @@ class dataLoader(Process):
     def log(self, message):
         self.logfile.write(str(message) + '\n')
         print str(message)
-        self.logfile.flush()
+        #self.logfile.flush()
         
     def _closeFile(self):
         self.open_file = None
@@ -122,6 +122,7 @@ class dataLoader(Process):
         self.open_file = None
         self.open_raster_band = None
         self.output_pipe.close()
+        self.logfile.flush()
         exit(1)
 
     """
@@ -175,4 +176,5 @@ class dataLoader(Process):
         self._getLines()
         self.output_pipe.close()
         print "Input file loaded from disk"
+        self.logfile.flush()
 
