@@ -1,7 +1,5 @@
-
 import dataLoader, gpuCalc, dataSaver
 import numpy as np
-
 from multiprocessing import Process, Pipe, active_children
 from time import sleep, time
 

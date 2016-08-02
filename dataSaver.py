@@ -133,10 +133,8 @@ class dataSaver(Process):
     writes exactly as many rows as defined in the header
     """
     def _writeFunc(self):
-        #write_rows = 50
         nrows = 0
-        while nrows < self.totalRows:
-            # get line from pipe   
+        while nrows < self.totalRows: 
             arr = [] 
             # remaining rows < write_rows, only write in as many as are extra
             if nrows + self.write_rows >= self.totalRows:
