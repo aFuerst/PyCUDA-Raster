@@ -593,18 +593,23 @@ be more accessible to the GIS community.
     much efficiency as possible, we used the GDAL libraries, Numpy, and PyCUDA
     \cite{pycuda_1} \cite{pycuda_2}. PyCUDA serves as a wrapper for CUDA C that
     handles many of the ugly details of memory allocation and transfer to the
-    GPU.  Unfortunately, kernel code to be executed on the GPU must still be
+    GPU. Unfortunately, kernel code to be executed on the GPU must still be
     written in C. 
     
     Our program's structure follows the model in figure \ref{model}. The
     following sections describe the implementation of each process.
 
     \subsection{Scheduler}
-    The scheduler class starts and manages the other processes. It is responsible
-    for parsing the desired input, functions, and output. It starts each other
-    process and coordinates passing information between them. The scheduler also
-    ensures that each other process terminates properly, and if not attempts to print
-    useful information about which process caused the error.
+    The scheduler class starts and manages the other processes. It is
+    responsible for parsing the desired input, functions, and output. It starts
+    each other process and coordinates passing information between them. The
+    scheduler also ensures that each other process terminates properly, and if
+    not attempts to print useful information about which process caused the
+    error. Although figure \ref{model} only depicts one saver, multiple
+    functions can be computed on a single file loaded by the data loader, and
+    the scheduler will generate a different saver to individually save each
+    output.
+
     \subsection{Loader}
     This loader class reads the data from a given input file and passes it into
     a pipe object, which goes to the GPU manager. We use the GDAL libraries to
@@ -615,28 +620,57 @@ be more accessible to the GIS community.
     use two dimensional blocks of data. The loader class is also responsible
     for providing the GPU Manager and data saver file metadata, such as the
     dimensions of the raster and the area that each pixel represents.
+
     Originally, we pulled lines from the file with GDAL one by one, matching
     how we send one row at a time through the pipe. However, we found that this
     could be made more efficient if GDAL read more rows per read call, likely
     because fewer system calls are made that way. Empirically, we found that it
     was optimal to cache around 30 rows at a time to be sent through the pipe.
+
+    The QGIS plugin version also supports reading raster data from a layer loaded
+    into QGIS rather than from disk. When read this way, the loader uses the QGIS
+    python API to load a Numpy array of a single row of data.
+
     \subsection{GPU Manager}
-    The GPU manager is where the desired slope, aspect, or hillshade calculations
-    are done. This class takes the data from the pipe that the loader added and 
-    spreads out over the GPUs many cores to perform its many calculations nearly 
-    simultaneously. The results are then places into the second pipe that leads 
-    to the saver to be written on to the disk.
+    The GPU manager is where the actual calculations on the data are performed,
+    and where the bulk of the code exists. The manager functions by reading a
+    page worth of data from the input pipe, performing GPU calculations on that
+    page, then sending that through an output pipe to the data saver. Each page
+    is sized to exactly fit a certain number of rows of data. The GPU manager
+    is designed to be robust in that it bases all of its memory management on
+    the GPU card of the system it runs on. Although the kernel code is somewhat
+    complex, it is designed so that one could write any algorithm based on a
+    3x3 grid of pixels to be plugged in and calculated.
+
+    The GPU manager starts by initializing the buffers which will be used to
+    copy memory to and retrieve memory from the GPU. These are based on the
+    available GPU memory when the process starts, so it should always saturate
+    GPU memory. It then pre-compiles the GPU kernels for each requested
+    calculation on the data. Then the manager enters the main processing loop
+    where data is received and analyzed.
+
+    Once the read buffer receives a page worth of data, it serially runs each
+    requested kernel, copies the results back from the GPU, and sends the data
+    for each kernel to a different saver. Each kernel is scheduled to run on
+    as many GPU cores as possible, to minimize computation time.
+
     \subsection{Saver}
-    The data saver class takes the results sent through the pipe by the GPU
-    manager and saves it to the disk. It takes the result and saves as a GEOtiff 
-    \(.tif\) file in order to conserve time and file size. 
+    The data saver class takes the results of the calculations done in the
+    GPU manager and saves them to disk. Similar to the data loader, the data
+    saver uses the GDAL libraries to write 30 lines at a time to a Geotiff.
+
     \subsection{QGIS Plugin}
-    The QGIS plugin lays out the gui for this implementation and lets our 
-    program be used from the app. The plugin loads a pop up which allows the user
-    to specify their input and where to save their output. The user then selects 
-    the combination of slope, aspect, and/or hillsahde they want calculated as 
-    well if they want output loaded directly into QGIS for viewing. While the
-    program is running a loading bar is visible to update on progress.
+    For QGIS, we implemented a simple GUI plugin that calls our code. The plugin
+    was made using the QGIS plugin builder tool to generate all of the skeleton
+    code and QT creator to design the GUI. The plugin takes input and output
+    information from the use, then calls the scheduler on those parameters.
+
+    Although there are a still a few issues, we also implemented loading data
+    from a QGIs layer, rather than from disk. This separate version of the loader
+    reads values using the QGIS API, so if QGIS has raster information cached in
+    memory, it should load values faster than from disk. The QGIS loader still
+    sends one row of data at a time through a pipe, so no changes are needed
+    for it to work with the GPU manager or data saver.
     
 \section{Analysis}
 Timing our implementation for parallel hillshade and slope calculation from a raster file
@@ -644,7 +678,8 @@ against the standard serial methods used in QGIS has revealed the input and
 output will be our biggest hurdle to overcome. Timing data can be seen in these
 tables.
 
-\vspace{0.25in}
+\vspace{.25in}
+\pagebreak
 \textbf{Hillshade timings}
 \vspace{0.05in}
 
