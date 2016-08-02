@@ -503,7 +503,7 @@ be more accessible to the GIS community.
     data from disk to main memory, and then from main memory to GPU memory.
     Memory transfer must occur four times for each GPU job, loading from disk
     to main memory, loading from main memory to GPU memory, and then copying
-    results from GPU memory back to main memory, and then to disk.  Further
+    results from GPU memory back to main memory, and then to disk. Further
     compounding the problem is that GPU memory is typically more limited than
     main memory, so multiple copies from main memory are required for files
     larger than the available memory on the GPU. Thus we have designed our
@@ -518,7 +518,7 @@ be more accessible to the GIS community.
     described in more detail in section \ref{implementation}. The three
     processes run independently, so data can be loaded from disk, calculations
     can be performed on the GPU, and data can be saved to disk all
-    simultaneously.  This provides parallelism both on the CPU for I/O, and on
+    simultaneously. This provides parallelism both on the CPU for I/O, and on
     the GPU for calculations, improving overall computation time.
     
     \subsection{GPU Kernel}
@@ -577,7 +577,7 @@ be more accessible to the GIS community.
     once the plugin is installed, a user need not even interact with the
     command line, or learn to use a new piece of software in order to perform
     GPU calculations. We have also tried to allow users to load data directly
-    from QGIS rather than from disk, but this software is still unstable.
+    from QGIS rather than from disk, but this feature is still unstable.
     \begin{figure}
         \includegraphics[width=\linewidth]{gui.png}
         \caption{Snapshot of plugin GUI.}
@@ -622,8 +622,8 @@ be more accessible to the GIS community.
     manager and saves it to the disk. It takes the result and saves as a GEOtiff 
     \(.tif\) file in order to conserve time and file size. 
     \subsection{QGIS Plugin}
-    The Qgis plugin lays out the gui for this implementation and lets our 
-    program be used from the app. the plugin loads a pop up which allows the user
+    The QGIS plugin lays out the gui for this implementation and lets our 
+    program be used from the app. The plugin loads a pop up which allows the user
     to specify their input and where tosave their output. The user then selects 
     the combination of slope, aspect, and/or hillsahde they want calculated as 
     well if they want ouput loaded directly into Qgis for viewing. While the
@@ -632,7 +632,7 @@ be more accessible to the GIS community.
 \section{Analysis}
 Timing our implementation for parallel hillshade and slope calculation from a raster file
 against the standard serial methods used in QGIS has revealed the input and
-output will be our biggest hurdle to overcome. Timing data can be seen in these
+output are the biggest hurdles to overcome. Timing data can be seen in these
 tables.
 
 \vspace{0.25in}
@@ -672,16 +672,18 @@ tables.
 The PyCUDA version is consistently faster than QGIS when calculating hllshade for files
 of various sizes. The I/O bottleneck  can be seen in the input and output sections 
 of the second table. PyCUDA spends as much time dealing with disk as QGIS does which
-limits the possible speedup from using the GPU. Output is slightly fast thanks to compression
-done by GDAL. This speed increase is still significant however. GPU computations, 
-including CPU based memory management and took one third of the time 
+limits the possible speedup from using the GPU. Input takes a much longer time because
+it has to wait for the GPU to pass its data to the saver before it can start sending 
+information. Output is slightly faster thanks to compression done by GDAL.
+GPU computations, including CPU based memory management and took one third of the time 
 required to do the same thing in QGIS. While not shown in the tables, the total time 
 just on the GPU to compute hillshade for an 8 GB file is incredibly small.
 Including moving data to and from the card, the accumulated execution took less 
-than 2 seconds.  A processs that required hundreds or thousands
-of computations per element would be perfect for adaptation onto GPU processing.
-Both slope and hillshade are calculated in the same time by the GPU, showing that 
+than 2 seconds. Both slope and hillshade are calculated in the same time by the GPU, showing that 
 it isn't being taxed by the more complicated formula and could easily do more work.
+A processs that required hundreds or thousands of computations per element would be
+perfect for adaptation onto GPU processing. Testing showed that even computing 
+hillshade several hundred times on each pixel didn't increase the time needed to finish.
 
 
 \section{Conclusion}
@@ -711,7 +713,7 @@ a 3x3 grid around a given cell, however, with relatively little change, this
 could be extended to larger grids, like 5x5 or greater.  The GPU could also be
 used to different kinds of computation altogether with multiple kernels, such
 as analysis on raster data where each computation may have depenency on
-another, or even analysis on vector data.
+separate raster data, or even analysis on vector data.
 
 The plugin currently has minimal integration with QGIS. Aside from being able
 to load data using the QGIS API, the plugin is just a wrapper for the tool
