@@ -105,11 +105,13 @@ def run(inputFile, outputFiles, functions):
                 calc.stop()
                 for saver in savers:
                     saver.stop()
+                return True
                 break
             if calc.exitcode != None and calc.exitcode != 0:
                 loader.stop()
                 for saver in savers:
                     saver.stop()
+                return True
                 logfile.write("Error encountered in GPU calculater, ending tasks\n")
                 break
             sleep(1)
@@ -117,6 +119,7 @@ def run(inputFile, outputFiles, functions):
     except IOError as e:
         logfile.write(str(e) + "\n")
         print e
+        return True
 
     comp = time() - start
     print "Processing completed in: %d mins, %d secs" % (comp / 60, comp % 60)
@@ -125,6 +128,7 @@ def run(inputFile, outputFiles, functions):
     #loader.join()
     #calc.join()
     #saver.join()
+    return False
 
 if __name__ == '__main__':
     from sys import argv
