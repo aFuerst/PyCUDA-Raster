@@ -1,11 +1,8 @@
-from multiprocessing import Process,Pipe
+from multiprocessing import Process, Pipe
 import numpy as np
 from gpustruct import GPUStruct
-
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
-
-TOTALROWCOUNT = 0
 
 """
 GPUCalculator
@@ -71,9 +68,6 @@ class GPUCalculator(Process):
         self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
         self.carry_over_rows[0].fill(self.NODATA)
         self.carry_over_rows[1].fill(self.NODATA)
-
-    def __del__(self):
-        pass
 
     #--------------------------------------------------------------------------#
         
