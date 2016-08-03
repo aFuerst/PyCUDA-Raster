@@ -31,6 +31,7 @@ from qgis.utils import *
 import resources
 # Import the code for the dialog
 from cudaRaster_dialog import CUDARasterDialog
+from cudaRasterCrash_dialog import CUDARasterDialogCrash
 import os.path
 
 import scheduler
@@ -66,6 +67,7 @@ class CUDARaster:
 
         # Create the dialog (after translation) and keep reference
         self.dlg = CUDARasterDialog()
+        self.dlg2 = CUDARasterDialogCrash()
 
         # Declare instance attributes
         self.actions = []
@@ -268,7 +270,10 @@ class CUDARaster:
                              + "_" + function + ".tif") 
 
             # Run main code
-            scheduler.run(input_file, outputs, functions)
+            if scheduler.run(input_file, outputs, functions):
+                print "Something went wrong."
+                self.dlg2.show()
+                self.dlg2.pushButton.clicked.connect((lambda: self.dlg2.close()))
 
             # Load layer back into QGIS if requested
             if self.dlg.slope_check.isChecked() and self.dlg.qgis_slope_check.isChecked():

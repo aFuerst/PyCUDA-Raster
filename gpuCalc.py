@@ -161,7 +161,7 @@ class GPUCalculator(Process):
     def _recvData(self, count):
         if count == 0:
             #If this is the first page, insert a buffer row
-            np.put(self.to_gpu_buffer[0], self.np_copy_arr, self.carry_over_rows[0])
+            np.put(self.to_gpu_buffer[0], self.np_copy_arr, self.carry_over_rows[0])    
             row_count = 1
         else:
             #otherwise, insert carry over rows from last page
@@ -174,13 +174,13 @@ class GPUCalculator(Process):
             try:
                 if count + row_count > self.totalRows:
                     # end of file reached       
-                    cur_row = None
+                    cur_row = None             
                     self.to_gpu_buffer[row_count].fill(self.NODATA)
-                    return False # no more data to be gotten, tell run to stop looping
+                    return False
                 else:
                     cur_row = self.input_pipe.recv()
-                np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, cur_row)
 
+                np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, cur_row)
             #Pipe was closed unexpectedly
             except EOFError:
                 print "Pipe closed unexpectedly."
