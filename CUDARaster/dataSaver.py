@@ -168,8 +168,8 @@ class dataSaver(Process):
             if len(arr) == 1:
                 arr = [arr]
             self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
-            if nrows % (write_rows * 10) == 0:
-                self.dataset.FlushCache()
+            # if nrows % (write_rows * 10) == 0:
+            #     self.dataset.FlushCache()
             nrows+=write_rows
             self.pb.step(write_rows)
             self.rt.update()
