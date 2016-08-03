@@ -70,7 +70,7 @@ class GPUCalculator(Process):
         self.carry_over_rows[1].fill(self.NODATA)
 
     #--------------------------------------------------------------------------#
-        
+
     """
     run
 
@@ -94,8 +94,8 @@ class GPUCalculator(Process):
             compiled_kernels.append(kernel.get_function("raster_function"))
 
         #Process data while we continue to receive input
-        count = 0
-        while self._recvData(count):
+        processed_rows = 0
+        while self._recvData(processed_rows):
             #Copy input data to GPU
             cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
             for i in range(len(compiled_kernels)):
@@ -103,16 +103,16 @@ class GPUCalculator(Process):
                 self._processData(compiled_kernels[i])
                 #Get data back from GPU
                 cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu)
-                self._writeData(count, self.output_pipes[i])
+                self._writeData(processed_rows, self.output_pipes[i])
 
-            count += (self.maxPossRows-2)  # -2 because of buffer rows
-            print "Page done... %.3f %% completed" % ((float(count) / float(self.totalRows)) * 100)
+            processed_rows += (self.maxPossRows-2)  # -2 because of buffer rows
+            print "Page done... %.3f %% completed" % ((float(processed_rows) / float(self.totalRows)) * 100)
         #Process remaining data in buffer
         cuda.memcpy_htod(self.data_gpu, self.to_gpu_buffer)
         for i in range(len(self.functions)):
             self._processData(compiled_kernels[i])
             cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu) 
-            self._writeData(count, self.output_pipes[i])
+            self._writeData(processed_rows, self.output_pipes[i])
 
         for pipe in self.output_pipes:
             pipe.close()
@@ -160,14 +160,12 @@ class GPUCalculator(Process):
     def _recvData(self, count):
         if count == 0:
             #If this is the first page, insert a buffer row
-            for col in range(self.totalCols):
-                self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
+            np.put(self.to_gpu_buffer[0], [i for i in range(self.totalCols)], self.carry_over_rows[0])
             row_count = 1
         else:
             #otherwise, insert carry over rows from last page
-            for col in range(self.totalCols):
-                self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
-                self.to_gpu_buffer[1][col] = self.carry_over_rows[1][col]
+            np.put(self.to_gpu_buffer[0], [i for i in range(self.totalCols)], self.carry_over_rows[0])
+            np.put(self.to_gpu_buffer[1], [i for i in range(self.totalCols)], self.carry_over_rows[1])
             row_count = 2
 
         #Receive a page of data from buffer
@@ -178,12 +176,10 @@ class GPUCalculator(Process):
                     cur_row = None             
                     for col in range(self.totalCols):
                         self.to_gpu_buffer[row_count][col] = self.NODATA
-                    return False
+                    return False # no more data to be gotten, tell run to stop looping
                 else:
                     cur_row = self.input_pipe.recv()
-
-                for col in range(self.totalCols):
-                    self.to_gpu_buffer[row_count][col] = cur_row[col]
+                np.put(self.to_gpu_buffer[row_count], [i for i in range(self.totalCols)], cur_row)
 
             #Pipe was closed unexpectedly
             except EOFError:
@@ -196,7 +192,7 @@ class GPUCalculator(Process):
         np.put(self.carry_over_rows[0], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-2])
         np.put(self.carry_over_rows[1], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-1])
 
-        return True
+        return True # not finished reveiving data, tell run to keep looping
 
     #--------------------------------------------------------------------------#
 
@@ -214,6 +210,7 @@ class GPUCalculator(Process):
         num_blocks = grid[0] * grid[1]
         threads_per_block = block[0]*block[1]*block[2]
         pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)    
+
         # minimize work by each thread while makeing sure each pixel is calculated   
         while pixels_per_thread < 1:
             grid = (grid[0] - 16,grid[1] - 16)
@@ -247,7 +244,6 @@ class GPUCalculator(Process):
             if count + row > self.totalRows:
                 break
             out_pipe.send(self.from_gpu_buffer[row])
-
     #--------------------------------------------------------------------------#
 
     """
@@ -258,11 +254,14 @@ class GPUCalculator(Process):
     """
     def stop(self):
         print "Stopping gpuCalc..."
-        self.data_gpu.free()
-        self.result_gpu.free()
-        cuda.Context.pop()
+        try:
+            self.data_gpu.free() # free pagelocked memory
+            self.result_gpu.free()
+        except:
+            pass
+        cuda.Context.pop() # remove CUDA context
         for pipe in self.output_pipes:
-            pipe.close()
+            pipe.close()    # close all pipes
         self.input_pipe.close()
         exit(1)
 

@@ -135,7 +135,7 @@ class dataSaver(Process):
     def _writeFunc(self):
         nrows = 0
         while nrows < self.totalRows: 
-            arr = [] 
+            arr = []
             # remaining rows < write_rows, only write in as many as are extra
             if nrows + self.write_rows >= self.totalRows:
                 for row in range(self.totalRows - nrows):
