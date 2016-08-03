@@ -158,8 +158,8 @@ class dataSaver(Process):
             # write out rows
             self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
             # every 10 iterations expliticly write to disk, minimize calling this
-            if nrows % (self.write_rows * 10) == 0:
-                self.dataset.FlushCache()
+            # if nrows % (self.write_rows * 10) == 0:
+            #     self.dataset.FlushCache()
             nrows+=self.write_rows
             self.pb.step(self.write_rows)
             self.rt.update()
