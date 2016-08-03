@@ -68,6 +68,7 @@ class GPUCalculator(Process):
         self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
         self.carry_over_rows[0].fill(self.NODATA)
         self.carry_over_rows[1].fill(self.NODATA)
+        self.np_copy_arr = [i for i in range(self.totalCols)]
 
     #--------------------------------------------------------------------------#
 
@@ -160,12 +161,12 @@ class GPUCalculator(Process):
     def _recvData(self, count):
         if count == 0:
             #If this is the first page, insert a buffer row
-            np.put(self.to_gpu_buffer[0], [i for i in range(self.totalCols)], self.carry_over_rows[0])
+            np.put(self.to_gpu_buffer[0], self.np_copy_arr, self.carry_over_rows[0])
             row_count = 1
         else:
             #otherwise, insert carry over rows from last page
-            np.put(self.to_gpu_buffer[0], [i for i in range(self.totalCols)], self.carry_over_rows[0])
-            np.put(self.to_gpu_buffer[1], [i for i in range(self.totalCols)], self.carry_over_rows[1])
+            np.put(self.to_gpu_buffer[0], self.np_copy_arr, self.carry_over_rows[0])
+            np.put(self.to_gpu_buffer[1], self.np_copy_arr, self.carry_over_rows[1])
             row_count = 2
 
         #Receive a page of data from buffer
@@ -173,13 +174,12 @@ class GPUCalculator(Process):
             try:
                 if count + row_count > self.totalRows:
                     # end of file reached       
-                    cur_row = None             
-                    for col in range(self.totalCols):
-                        self.to_gpu_buffer[row_count][col] = self.NODATA
+                    cur_row = None
+                    self.to_gpu_buffer[row_count].fill(self.NODATA)
                     return False # no more data to be gotten, tell run to stop looping
                 else:
                     cur_row = self.input_pipe.recv()
-                np.put(self.to_gpu_buffer[row_count], [i for i in range(self.totalCols)], cur_row)
+                np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, cur_row)
 
             #Pipe was closed unexpectedly
             except EOFError:
@@ -189,13 +189,12 @@ class GPUCalculator(Process):
             row_count += 1
             
         #Update carry over rows
-        np.put(self.carry_over_rows[0], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-2])
-        np.put(self.carry_over_rows[1], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-1])
+        np.put(self.carry_over_rows[0], self.np_copy_arr, self.to_gpu_buffer[self.maxPossRows-2])
+        np.put(self.carry_over_rows[1], self.np_copy_arr, self.to_gpu_buffer[self.maxPossRows-1])
 
         return True # not finished reveiving data, tell run to keep looping
 
     #--------------------------------------------------------------------------#
-
 
     """
     _processData
@@ -242,8 +241,9 @@ class GPUCalculator(Process):
     def _writeData(self, count, out_pipe):
         for row in range(1, self.maxPossRows-1):
             if count + row > self.totalRows:
-                break
+                return
             out_pipe.send(self.from_gpu_buffer[row])
+ 
     #--------------------------------------------------------------------------#
 
     """

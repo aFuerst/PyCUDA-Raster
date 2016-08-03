@@ -37,13 +37,13 @@ class dataLoader(Process):
     opens the input file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, _input_file, _output_pipe):
+    def __init__(self, _input_file, _output_pipe, _disk_rows):
         Process.__init__(self)
         print os.path.realpath(__file__)
         if os.path.exists(os.path.realpath(__file__)[:-len("dataLoader.py")+1] + "data_loader_log.txt"):
             os.remove(os.path.realpath(__file__)[:-len("dataLoader.py")+1] + "data_loader_log.txt")
         self.logfile = open(os.path.realpath(__file__)[:-len("dataLoader.py")+1] + "data_loader_log.txt", 'w')
-
+        self.read_rows = _disk_rows
         self.output_pipe = _output_pipe
         self.file_name = _input_file
         self.file_type = None
@@ -144,28 +144,31 @@ class dataLoader(Process):
     to the GPUCalculator class
     """
     def _getLines(self):
-        read_rows = 50
         line_num = 0
         while line_num <= self.totalRows:
+            # no need to read more, ended exactly at EOF
             if line_num == self.totalRows:
                 return
             try:
-                if line_num + read_rows >= self.totalRows - 1:
+                # remaining rows < read_rows, only read in as many as are extra
+                if line_num + self.read_rows >= self.totalRows:
                     remaining = self.totalRows - line_num
                     line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,remaining,buf_type=self.dataType)
                     f=struct.unpack(self.unpackVal*remaining, line_tup)
                     for line in range(remaining):
                         self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
+                    
+                # read in as many rows as read_rows indicates
                 else:
-                    line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,read_rows,buf_type=self.dataType)
-                    f=struct.unpack(self.unpackVal*read_rows, line_tup)
-                    for line in range(read_rows):
+                    line_tup = self.open_raster_band.ReadRaster(0, line_num, self.totalCols, self.read_rows, buf_type=self.dataType)
+                    f=struct.unpack(self.unpackVal*self.read_rows, line_tup)
+                    for line in range(self.read_rows):
                         self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
             # EOF
             except RuntimeError as e:
                 print e
                 return
-            line_num += read_rows
+            line_num += self.read_rows
 
     """
     _loadFunc

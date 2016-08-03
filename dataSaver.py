@@ -73,7 +73,7 @@ class dataSaver(Process):
         self._gui()
         self._writeFunc()
         self._closeFile()
-
+ 
     """
     _gui
 
@@ -152,19 +152,12 @@ class dataSaver(Process):
                     except EOFError:
                         print "Pipe closed unexpectedly"
                         self.stop()
-            # WriteAray needs a 2D array, make sure it always gets that
-            if len(arr) == 1:
-                arr = [arr]
             # write out rows
             self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
-            # every 10 iterations expliticly write to disk, minimize calling this
-            if nrows % (self.write_rows * 10) == 0:
-                self.dataset.FlushCache()
             nrows+=self.write_rows
             self.pb.step(self.write_rows)
             self.rt.update()
         # write out remaining lines
         self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name
-
         

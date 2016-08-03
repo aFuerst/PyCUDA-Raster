@@ -42,7 +42,7 @@ class dataSaver(Process):
     opens the output file and grabs the header information
     sets several instance variables
     """
-    def __init__(self, _output_file,  header, _input_pipe):
+    def __init__(self, _output_file,  header, _input_pipe, _disk_rows):
         Process.__init__(self)
     
         if os.path.exists(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt"):
@@ -51,6 +51,7 @@ class dataSaver(Process):
 
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
+        self.write_rows = _disk_rows
         self.log("done init")
 
         #unpack header info
@@ -146,12 +147,11 @@ class dataSaver(Process):
     writes exactly as many rows as defined in the header
     """
     def _writeFunc(self):
-        write_rows = 50
         nrows = 0
-        while nrows < self.totalRows:
-            # get line from pipe   
-            arr = [] 
-            if nrows + write_rows >= self.totalRows:
+        while nrows < self.totalRows: 
+            arr = []
+            # remaining rows < write_rows, only write in as many as are extra
+            if nrows + self.write_rows >= self.totalRows:
                 for row in range(self.totalRows - nrows):
                     try:
                         arr.append(self.input_pipe.recv())
@@ -159,21 +159,19 @@ class dataSaver(Process):
                         self.log("Pipe closed unexpectedly")
                         self.stop()
             else:
-                for row in range(write_rows):
+                # write in as many rows as write_rows indicates
+                for row in range(self.write_rows):
                     try:
                         arr.append(self.input_pipe.recv())
                     except EOFError:
                         self.log("Pipe closed unexpectedly")
                         self.stop()
-            if len(arr) == 1:
-                arr = [arr]
+            # write out rows
             self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
-            if nrows % (write_rows * 10) == 0:
-                self.dataset.FlushCache()
-            nrows+=write_rows
-            self.pb.step(write_rows)
+            nrows+=self.write_rows
+            self.pb.step(self.write_rows)
             self.rt.update()
+        # write out remaining lines
         self.dataset.FlushCache()
-        print "Output %s written to disk" % self.file_name
-        self.logfile.flush()
+        self.log("Output %s written to disk" % self.file_name)
 

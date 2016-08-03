@@ -34,7 +34,7 @@ email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gu
 
 # input and output files must have the same file type
 
-def run(inputFile, outputFiles, functions):
+def run(inputFile, outputFiles, functions, disk_rows = 20):
     print os.path.realpath(__file__)
     if os.path.exists(os.path.realpath(__file__)[:-len("scheduler.py")+1] + "scheduler_log.txt"):
         os.remove(os.path.realpath(__file__)[:-len("scheduler.py")+1] + "scheduler_log.txt")
@@ -79,23 +79,20 @@ def run(inputFile, outputFiles, functions):
         savers = []
         for i in range(len(outputFiles)):
             savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1]))
-
         logfile.write("made saver threads\n")
         logfile.flush()
+
         # start all threads
         loader.start()
-
         logfile.write("started loader\n")
         logfile.flush()
 
         calc.start()
-
         logfile.write("started gpuCalc\n")
         logfile.flush()
 
         for i in range(len(outputFiles)):
             savers[i].start()
-
         logfile.write("started savers\n")
 
         # join all threads
@@ -122,16 +119,14 @@ def run(inputFile, outputFiles, functions):
     print "Processing completed in: %d mins, %d secs" % (comp / 60, comp % 60)
     logfile.write("Processing completed in: %d mins, %d secs\n" % (comp / 60, comp % 60))
     logfile.write("program ended")
-    #loader.join()
-    #calc.join()
-    #saver.join()
 
 if __name__ == '__main__':
     from sys import argv
     outFiles = []
     funcs = []
-    for i in range(2,len(argv),2):
+    disk_rows = 15  # 30 appears to be optimal number of rows to read at a time for any file
+    for i in range(2,len(argv), 2):
         outFiles.append(argv[i])
         funcs.append(argv[i+1].lower())
-    run(argv[1], outFiles, funcs)
+    run(argv[1], outFiles, funcs, disk_rows)
 

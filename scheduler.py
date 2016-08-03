@@ -23,7 +23,7 @@ email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gu
 
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
-def run(inputFile, outputFiles, functions, disk_rows = 30):
+def run(inputFile, outputFiles, functions, disk_rows = 15):
     start = time()
     # create input and output pipes    
     inputPipe = Pipe()
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     from sys import argv
     outFiles = []
     funcs = []
-    disk_rows = 30  # 30 appears to be optimal number of rows to read at a time for any file
+    disk_rows = 15  # 30 appears to be optimal number of rows to read at a time for any file
     for i in range(2,len(argv), 2):
         outFiles.append(argv[i])
         funcs.append(argv[i+1].lower())
