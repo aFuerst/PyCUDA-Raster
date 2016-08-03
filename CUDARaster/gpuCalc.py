@@ -165,14 +165,12 @@ class GPUCalculator(Process):
     def _recvData(self, count):
         if count == 0:
             #If this is the first page, insert a buffer row
-            for col in range(self.totalCols):
-                self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
+            np.put(self.to_gpu_buffer[0], self.np_copy_arr, self.carry_over_rows[0])    
             row_count = 1
         else:
             #otherwise, insert carry over rows from last page
-            for col in range(self.totalCols):
-                self.to_gpu_buffer[0][col] = self.carry_over_rows[0][col]
-                self.to_gpu_buffer[1][col] = self.carry_over_rows[1][col]
+            np.put(self.to_gpu_buffer[0], self.np_copy_arr, self.carry_over_rows[0])
+            np.put(self.to_gpu_buffer[1], self.np_copy_arr, self.carry_over_rows[1])
             row_count = 2
 
         #Receive a page of data from buffer
@@ -181,15 +179,12 @@ class GPUCalculator(Process):
                 if count + row_count > self.totalRows:
                     # end of file reached       
                     cur_row = None             
-                    for col in range(self.totalCols):
-                        self.to_gpu_buffer[row_count][col] = self.NODATA
+                    self.to_gpu_buffer[row_count].fill(self.NODATA)
                     return False
                 else:
                     cur_row = self.input_pipe.recv()
 
-                for col in range(self.totalCols):
-                    self.to_gpu_buffer[row_count][col] = cur_row[col]
-
+                np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, cur_row)
             #Pipe was closed unexpectedly
             except EOFError:
                 print "Pipe closed unexpectedly."
@@ -202,7 +197,6 @@ class GPUCalculator(Process):
         np.put(self.carry_over_rows[1], [i for i in range(self.totalCols)], self.to_gpu_buffer[self.maxPossRows-1])
 
         return True
-
     #--------------------------------------------------------------------------#
 
 
