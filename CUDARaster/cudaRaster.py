@@ -242,7 +242,7 @@ class CUDARaster:
 
             # If no layer already in QGIS was selected, check input from disk.
             else:
-                input_file = self.dlg.input_line.text()
+                input_file = str(self.dlg.input_line.text())
                 if input_file == "":
                     print "NO OPTION SELECTED!"
                     return
@@ -251,7 +251,7 @@ class CUDARaster:
                     input_file_name = input_file[input_file.rfind('/')+1:]
                     input_file_name = "/" + input_file_name[:-4]
                 else:
-                    input_file_name = input_file[input_file.rfind('\\')+1:]
+                    input_file_name = input_file[input_file.rfind('/')+1:]
                     input_file_name = "\\" + input_file_name[:-4]
 
                 print "file name: ", input_file_name
@@ -265,7 +265,7 @@ class CUDARaster:
             if self.dlg.hillshade_check.isChecked():
                 functions.append("hillshade")
             for function in functions:
-                outputs.append(self.dlg.output_line.text()\
+                outputs.append(str(self.dlg.output_line.text())\
                              + input_file_name\
                              + "_" + function + ".tif") 
 
@@ -298,3 +298,5 @@ class CUDARaster:
                         rlayer = QgsRasterLayer(string, baseName)
                         QgsMapLayerRegistry.instance().addMapLayer(rlayer)
 		
+if __name__=="__main__":
+    pass

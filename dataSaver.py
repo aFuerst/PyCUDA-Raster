@@ -161,3 +161,5 @@ class dataSaver(Process):
         self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name
         
+if __name__=="__main__":
+    pass

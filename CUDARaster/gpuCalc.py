@@ -71,6 +71,7 @@ class GPUCalculator(Process):
         self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
         self.carry_over_rows[0].fill(self.NODATA)
         self.carry_over_rows[1].fill(self.NODATA)
+        self.np_copy_arr = [i for i in range(self.totalCols)]
 
     def __del__(self):
         pass
@@ -491,3 +492,6 @@ class GPUCalculator(Process):
                     }
                     """)
         return mod
+
+if __name__=="__main__":
+    pass

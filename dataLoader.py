@@ -172,3 +172,5 @@ class dataLoader(Process):
         print "Input file loaded from disk"
 
 
+if __name__=="__main__":
+    pass

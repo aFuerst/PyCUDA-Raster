@@ -58,7 +58,7 @@ def run(inputFile, outputFiles, functions, disk_rows = 20):
             logfile.write("loading from disk\n")
             logfile.flush()
             print "loading from disk"
-            loader = dataLoader.dataLoader(inputFile, inputPipe[0])
+            loader = dataLoader.dataLoader(inputFile, inputPipe[0], disk_rows)
         else:
             print "loading from qgis"
             logfile.write("loading from qgis\n")
@@ -78,7 +78,7 @@ def run(inputFile, outputFiles, functions, disk_rows = 20):
 
         savers = []
         for i in range(len(outputFiles)):
-            savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1]))
+            savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1], disk_rows))
         logfile.write("made saver threads\n")
         logfile.flush()
 
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     from sys import argv
     outFiles = []
     funcs = []
-    disk_rows = 15  # 30 appears to be optimal number of rows to read at a time for any file
+    disk_rows = 50  
     for i in range(2,len(argv), 2):
         outFiles.append(argv[i])
         funcs.append(argv[i+1].lower())
