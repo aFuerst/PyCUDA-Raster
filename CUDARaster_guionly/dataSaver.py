@@ -1,10 +1,10 @@
 from multiprocessing import Process, Pipe
 import numpy as np
-import os.path
-import os
+from os.path import exists
+from os import remove
 from osgeo import gdal
-import Tkinter as tk
-import ttk
+#import Tkinter as tk
+#import ttk
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -45,14 +45,9 @@ class dataSaver(Process):
     def __init__(self, _output_file,  header, _input_pipe, _disk_rows):
         Process.__init__(self)
     
-        if os.path.exists(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt"):
-            os.remove(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt")
-        self.logfile = open(os.path.realpath(__file__)[:-len("dataSaver.py")] + "data_saver_log.txt", 'w')
-
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
         self.write_rows = _disk_rows
-        self.log("done init")
 
         #unpack header info
         self.totalCols = header[0]
@@ -63,12 +58,6 @@ class dataSaver(Process):
         self.yllcorner = header[5]
         self.GeoT = header[6]
         self.prj = header[7]
-        self.log((header))
-
-    def log(self, message):
-        self.logfile.write(str(message) + '\n')
-        print str(message)
-        #self.logfile.flush()
 
     def __del__(self):
         pass
@@ -81,21 +70,21 @@ class dataSaver(Process):
     """
     def run(self):
         self._openFile()
-        self._gui()
+        #self._gui()
         self._writeFunc()
         self._closeFile()
-
+ 
     """
     _gui
 
     tkinter gui to dispaly write out progress
     """
-    def _gui(self):
-        self.rt = tk.Tk()
-        self.pb=ttk.Progressbar(mode="determinate", maximum=self.totalRows)
-        self.lb = ttk.Label(text = self.file_name + " progress")
-        self.lb.pack(side="top", fill="x")
-        self.pb.pack(side="bottom", fill="x")
+    #def _gui(self):
+    #    self.rt = tk.Tk()
+    #    self.pb=ttk.Progressbar(mode="determinate", maximum=self.totalRows)
+    #    self.lb = ttk.Label(text = self.file_name + " progress")
+    #    self.lb.pack(side="top", fill="x")
+    #    self.pb.pack(side="bottom", fill="x")
 
     """
     _closeFile
@@ -104,8 +93,6 @@ class dataSaver(Process):
     """
     def _closeFile(self):
         self.dataset.FlushCache()
-        self.dataset = None
-
 
     """
     stop
@@ -114,10 +101,9 @@ class dataSaver(Process):
     Closes file and pipes
     """
     def stop(self):
-        self.log("Stopping saver " + self.file_name  +" ...")
+        print "Stopping saver ", self.file_name ," ..."
         self._closeFile()
         self.input_pipe.close()
-        self.logfile.flush()
         exit(1)
 
     """
@@ -127,11 +113,11 @@ class dataSaver(Process):
     stores open file object in instance variable 
     """
     def _openFile(self):
-        if os.path.exists(self.file_name):
-            self.log(self.file_name + " already exists. Deleting it...")
-            os.remove(self.file_name)
+        if exists(self.file_name):
+            print self.file_name, "already exists. Deleting it..."
+            remove(self.file_name)
         self.driver = gdal.GetDriverByName('GTiff')
-        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32, options = ['COMPRESS=DEFLATE', 'BIGTIFF=YES'])
         self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
         self.dataset.SetGeoTransform(self.GeoT)
         try:
@@ -156,7 +142,7 @@ class dataSaver(Process):
                     try:
                         arr.append(self.input_pipe.recv())
                     except EOFError:
-                        self.log("Pipe closed unexpectedly")
+                        print "Pipe closed unexpectedly"
                         self.stop()
             else:
                 # write in as many rows as write_rows indicates
@@ -164,17 +150,15 @@ class dataSaver(Process):
                     try:
                         arr.append(self.input_pipe.recv())
                     except EOFError:
-                        self.log("Pipe closed unexpectedly")
+                        print "Pipe closed unexpectedly"
                         self.stop()
             # write out rows
             self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
             nrows+=self.write_rows
-            self.pb.step(self.write_rows)
-            self.rt.update()
+            #self.pb.step(self.write_rows)
+            #self.rt.update()
         # write out remaining lines
         print "Flushing out remaining data for %s" % self.file_name
         self.dataset.FlushCache()
-        self.log("Output %s written to disk" % self.file_name)
-
-if __name__=="__main__":
-    pass
+        print "Output %s written to disk" % self.file_name
+        
