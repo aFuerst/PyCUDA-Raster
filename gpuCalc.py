@@ -115,10 +115,9 @@ class GPUCalculator(Process):
             cuda.memcpy_dtoh(self.from_gpu_buffer, self.result_gpu) 
             self._writeData(processed_rows, self.output_pipes[i])
 
+        print "GPU calculations finished"
         for pipe in self.output_pipes:
             pipe.close()
-
-        print "GPU calculations finished"
         # clean up on GPU
         self.data_gpu.free()
         self.result_gpu.free()
@@ -171,21 +170,17 @@ class GPUCalculator(Process):
 
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
-            try:
-                if count + row_count > self.totalRows:
-                    # end of file reached       
-                    cur_row = None             
-                    self.to_gpu_buffer[row_count].fill(self.NODATA)
-                    return False
-                else:
-                    cur_row = self.input_pipe.recv()
-
-                np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, cur_row)
-            #Pipe was closed unexpectedly
-            except EOFError:
-                print "Pipe closed unexpectedly."
-                self.stop()
-
+            if count + row_count > self.totalRows:
+                # end of file reached                 
+                self.to_gpu_buffer[row_count].fill(self.NODATA)
+                return False
+            else:
+                try:
+                    np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, self.input_pipe.recv())
+                #Pipe was closed unexpectedly
+                except EOFError:
+                    print "Pipe closed unexpectedly."
+                    self.stop()
             row_count += 1
             
         #Update carry over rows
@@ -391,7 +386,7 @@ class GPUCalculator(Process):
                 hillshade(dz_dx, dz_dy)
                 """)
         else:
-            print "Function not implemented"
+            print "Function %s not implemented" % func
             raise NotImplementedError
 
     #--------------------------------------------------------------------------#
@@ -417,6 +412,7 @@ class GPUCalculator(Process):
                     #define M_PI 3.14159625
                     #endif
                     typedef struct{
+                            /* struct representing the relevant data passed in by host */
                             double pixels_per_thread;
                             double NODATA;
                             unsigned long long ncols;

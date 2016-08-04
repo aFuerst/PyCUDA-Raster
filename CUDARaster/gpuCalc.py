@@ -175,21 +175,17 @@ class GPUCalculator(Process):
 
         #Receive a page of data from buffer
         while row_count <  self.maxPossRows:
-            try:
-                if count + row_count > self.totalRows:
-                    # end of file reached       
-                    cur_row = None             
-                    self.to_gpu_buffer[row_count].fill(self.NODATA)
-                    return False
-                else:
-                    cur_row = self.input_pipe.recv()
-
-                np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, cur_row)
-            #Pipe was closed unexpectedly
-            except EOFError:
-                print "Pipe closed unexpectedly."
-                self.stop()
-
+            if count + row_count > self.totalRows:
+                # end of file reached                 
+                self.to_gpu_buffer[row_count].fill(self.NODATA)
+                return False
+            else:
+                try:
+                    np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, self.input_pipe.recv())
+                #Pipe was closed unexpectedly
+                except EOFError:
+                    print "Pipe closed unexpectedly."
+                    self.stop()
             row_count += 1
             
         #Update carry over rows
