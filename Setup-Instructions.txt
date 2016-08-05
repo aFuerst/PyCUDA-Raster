@@ -45,9 +45,13 @@ do later Python library installations.
     Select the one titled "pycuda-2016.1.2+cuda7518-cp27-cp27m-win_amd64.whl"
     Navigate to your downloads folder in command prompt and run "pip install pycuda-2016.1.2+cuda7518-cp27-cp27m-win_amd64.whl"
 
-9) This allows the program to be run from the command line. To enable the QGIS
-    plugin to work, the same changes must be made to the Python installation
-    that QGIS uses, "C:\Program files\QGIS 2.14.x\apps\Python27" (this is untested). 
+9) (OPTIONAL) Install PyQT4
+    In order to use the standalone GUI, you need the PyQT4 libraries.
+    http://www.lfd.uci.edu/~gohlke/pythonlibs/#pyqt4
+    Select the package titles "PyQt4-4.11.4-cp27-none-win_amd64.whl"
+    Navigate to your downloads folder in command prompt and run "pip install PyQt4-4.11.4-cp27-none-win_amd64.whl"
+
+**THIS INSTALLATION WILL NOT WORK WITH QGIS. OUR PLUGIN DOESN'T CURRENTLY SUPPORT WINDOWS**
 
 ##################################################################################
 

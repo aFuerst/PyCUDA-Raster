@@ -172,6 +172,9 @@ class dataSaver(Process):
             self.pb.step(self.write_rows)
             self.rt.update()
         # write out remaining lines
+        print "Flushing out remaining data for %s" % self.file_name
         self.dataset.FlushCache()
         self.log("Output %s written to disk" % self.file_name)
 
+if __name__=="__main__":
+    pass

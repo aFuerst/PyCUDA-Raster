@@ -3,8 +3,8 @@ import numpy as np
 from os.path import exists
 from os import remove
 from osgeo import gdal
-import Tkinter as tk
-import ttk
+#import Tkinter as tk
+#import ttk
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -70,7 +70,7 @@ class dataSaver(Process):
     """
     def run(self):
         self._openFile()
-        self._gui()
+        #self._gui()
         self._writeFunc()
         self._closeFile()
  
@@ -79,12 +79,12 @@ class dataSaver(Process):
 
     tkinter gui to dispaly write out progress
     """
-    def _gui(self):
-        self.rt = tk.Tk()
-        self.pb=ttk.Progressbar(mode="determinate", maximum=self.totalRows)
-        self.lb = ttk.Label(text = self.file_name + " progress")
-        self.lb.pack(side="top", fill="x")
-        self.pb.pack(side="bottom", fill="x")
+    #def _gui(self):
+    #    self.rt = tk.Tk()
+    #    self.pb=ttk.Progressbar(mode="determinate", maximum=self.totalRows)
+    #    self.lb = ttk.Label(text = self.file_name + " progress")
+    #    self.lb.pack(side="top", fill="x")
+    #    self.pb.pack(side="bottom", fill="x")
 
     """
     _closeFile
@@ -117,7 +117,7 @@ class dataSaver(Process):
             print self.file_name, "already exists. Deleting it..."
             remove(self.file_name)
         self.driver = gdal.GetDriverByName('GTiff')
-        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32, options = ['COMPRESS=DEFLATE', 'NUM_THREADS=2', 'BIGTIFF=IF_NEEDED'])
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32, options = ['COMPRESS=DEFLATE', 'BIGTIFF=YES'])
         self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
         self.dataset.SetGeoTransform(self.GeoT)
         try:
@@ -134,17 +134,13 @@ class dataSaver(Process):
     """
     def _writeFunc(self):
         nrows = 0
-        arr = np.ndarray(shape=(self.write_rows, self.totalCols), dtype=np.float32)
-        np_write_arr = [i for i in range(self.totalCols)]
-        while nrows < self.totalRows:
-            #arr = []
+        while nrows < self.totalRows: 
+            arr = []
             # remaining rows < write_rows, only write in as many as are extra
             if nrows + self.write_rows >= self.totalRows:
-                rem = self.totalRows - nrows
-                arr.resize((rem, self.totalCols))
-                for row in range(rem):
+                for row in range(self.totalRows - nrows):
                     try:
-                        np.put(arr, np_write_arr, self.input_pipe.recv())
+                        arr.append(self.input_pipe.recv())
                     except EOFError:
                         print "Pipe closed unexpectedly"
                         self.stop()
@@ -152,19 +148,17 @@ class dataSaver(Process):
                 # write in as many rows as write_rows indicates
                 for row in range(self.write_rows):
                     try:
-                        np.put(arr, np_write_arr, self.input_pipe.recv())
+                        arr.append(self.input_pipe.recv())
                     except EOFError:
                         print "Pipe closed unexpectedly"
                         self.stop()
             # write out rows
-            self.dataset.GetRasterBand(1).WriteArray(arr, 0, nrows)
+            self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
             nrows+=self.write_rows
-            self.pb.step(self.write_rows)
-            self.rt.update()
+            #self.pb.step(self.write_rows)
+            #self.rt.update()
         # write out remaining lines
+        print "Flushing out remaining data for %s" % self.file_name
         self.dataset.FlushCache()
         print "Output %s written to disk" % self.file_name
-
-if __name__=="__main__":
-    pass
-
+        

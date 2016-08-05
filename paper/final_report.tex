@@ -385,7 +385,7 @@
 % As a general rule, do not put math, special symbols or citations
 % in the abstract or keywords.
 \begin{abstract}
-    Geographic Information Systems (GIS) are used to in many different fields
+    Geographic Information Systems (GIS) are used in many different fields
     to analyze spatial data and plan accordingly. Geographic data has been
     growing in size exponentially, and while some GIS tools to analyze this
     data have been created, usage and efficiency have been lagging behind. The
@@ -393,8 +393,8 @@
     GPU programming, have made a more efficient solution possible since most
     GIS calculations are embarrassingly parallel. QGIS is an open source GIS
     platform that has gained much traction in the computational geography
-    community. We are creating a QGIS plugin that leverages GPUs to increase
-    calculation speed on large data sets. We are developing this plugin with
+    community. We created a QGIS plugin that leverages GPUs to increase
+    calculation speed on large data sets. We developed this plugin with
     the geography community in mind, using Python to make code easy to read,
     portable, and modifiable.
 \end{abstract}
@@ -437,14 +437,14 @@
 \IEEEPARstart{P}{ARALLEL} computing has been adopted in many fields to improve
 computation efficiency. Although many analytics in Geographic Information
 Systems (GIS) are embarrassingly parallelizable, parallel computing has yet to
-be largely adopted in the community. We're developing open source software for
+be largely adopted in the community. We've developed open source software for
 parallel raster calculations to spur the GIS community to adopt parallel
 computing practices. This plugin was built for the popular, open source GIS
-software QGIS, that performs parallel slope, aspect and/or hillshade calculations 
-on an arbitrary raster file.  We've implemented the plugin using Python and 
-PyCUDA, an open source library for Python built on top of the CUDA programming
-language for \textsc{NVIDIA} graphics cards. Our current results indicate a 
-efficient, scalable improvement over similar serial calculations.
+software QGIS, and performs parallel slope, aspect and/or hillshade
+calculations on an arbitrary raster file.  We've implemented the plugin using
+Python and PyCUDA, an open source library for Python built on top of the CUDA
+programming language for \textsc{NVIDIA} graphics cards. Our current results
+indicate a efficient, scalable improvement over similar serial calculations.
 
 \section{Related Work} \label{related}
 The idea of using parallel processing in GIS had been around for a long time
@@ -464,13 +464,13 @@ be more accessible to the GIS community.
     \subsection{Computational Challenges}
     GIS analytics perform many independent calculations on extremely large data
     sets. This proves problematic due to the memory limitations of a single
-    machine, and the massive amount of calculations needed to run. Data sets 
-    typically analyzed by GIS can be in the terabyte (TB) size realm. With
+    machine, and the massive amount of calculations that need to be run. Data sets 
+    typically analyzed by GIS can be in the terabyte (TB) realm. With
     most computers only having memory capabilities in the gigabyte (GB) range,
     steps must be taken to work around running out of memory. Both the large size
     of data sets and the requirement that each piece of data be analyzed separately
     slows down processing time dramatically. Input from and output to data sets
-    and memory have proven to be a major component to the slow down.  However
+    and memory have proven to be a major component to the slow down.  However,
     performing the large amount of independent calculations through serial
     programming also bogs down the process. Our goal is to build a system that
     maximizes Input/Output (I/O) throughput as well as reduce computation time
@@ -521,17 +521,18 @@ be more accessible to the GIS community.
     the GPU for calculations, improving overall computation time.
     
     \subsection{GPU Kernel}
-    The GPU kernel is designed to perform analysis on individual cells in a
-    raster file based on a 3x3 grid around the cell. The kernel was designed to
-    be modular so that any kind of calculation can be done based on the 3x3
-    grid of neighbors. A user simply needs to write the desired calculation,
-    and the rest of the kernel was written to fetch the correct data, ensuring
-    that all of the correct data is available on any given thread for a 3x3
-    grid calculation. The kernel uses a grid striding loop for flexibility and
+    The GPU kernel, the algorithm that is executed on the GPU in parallel, is
+    designed to perform analysis on individual cells in a raster file based on
+    a 3x3 grid around the cell. The kernel was designed to be modular so that
+    any kind of calculation can be done based on the 3x3 grid of neighbors. A
+    user simply needs to write the desired calculation, and the rest of the
+    kernel was written ensure that all of the correct data is available on any
+    given thread for a 3x3 grid calculation.  The kernel uses a grid striding
+    loop for flexibility and
     efficiency\cite{grid_stride}.
 
     \subsection{GIS Algorithms}
-    The algorithms we are implementing utilize a 3x3 cell neighborhood around each 
+    The algorithms we implemented utilize a 3x3 cell neighborhood around each 
     calculated cell. 
     \begin{figure}
         \center
@@ -544,30 +545,30 @@ be more accessible to the GIS community.
     \(\frac{dz}{dy}\). These are found as follows:
     \[\frac{dz}{dx} = ((c + 2f + i) - (a + 2d + g) / (8 * x\_cellsize)\]
     \[\frac{dz}{dy} = ((g + 2h + i) - (a + 2b + c)) / ( 8 * y\_cellsize)\]
-    With these rates of change now found they can be used to calculate slope,
-    aspect and hillshade. Slope is the maximum rate of change in elevation
-    between the cell and its neighbors.The lower the slope value the flatter
-    the land is. It is calculated with the following formula:
+    where the letters correspond to the positions in \ref{GIS grid}.
+
+    These rates of change are used to calculate slope, aspect and hillshade.
+    Slope is the maximum rate of change in elevation between the cell and its
+    neighbors. The lower the slope value the flatter the land is. It is
+    calculated with the following formula:
     \[Slope = ATAN\Bigg(\sqrt{\Big(\frac{dz}{dx}\Big)^{2} + \Big(\frac{dz}{dy}\Big)^{2}}~\Bigg)\]
 
-    Aspect relates to slope to identify the direction of the downslope. Aspect
-    is found  using conditional steps and is calculated in degrees, which can
-    be converted to radians.
-    %If \(\frac{dz}{dx}\) or \(\frac{dz}{dy}\) equals a no data value
-    %\[Aspect = no data value\]
+    Aspect identies the direction of the downslope. Aspect is found using
+    %conditional steps and is calculated in degrees, which can be converted to
+    %radians.
+    the following formula:
     \[Aspect = 57.29578 * ATAN2\bigg(\frac{dz}{dy}, -\frac{dz}{dx}\bigg)\]
 
     Hillshade is the hypothetical illumination of the surface when the sun is
     at a specific height and angle in the sky. It is a more complex algorithm
     and relies on slope and aspect being calculated in addition to finding the
-    illumination angle zenith (abbreviated \(zen\) and illumination
-    direction azimuth (abbreviated \(azm\). We have defaulted these values
+    illumination angle zenith (abbreviated \(zen\)) and illumination
+    direction azimuth (abbreviated \(azm\)). We have defaulted these values
     to 45 degrees and 315 degrees respectively.
     \begin{align*}
         Hillshade =& ~ 255.0 ((COS(zen) * COS(slope)) ~ +  \\
                    &(SIN(zen) * SIN(slope) * COS(azm - aspect))
     \end{align*}
-    %\[Hillshade = 255.0 ((COS(Zenith) * COS(Slope)) +  (SIN(Zenith) * SIN(Slope) * COS(Azimuth - Aspect))\]
 
     \subsection{QGIS Integration}
     We have constructed a QGIS plugin, depicted in figure \ref{gui} which uses
@@ -611,9 +612,9 @@ be more accessible to the GIS community.
     output.
 
     \subsection{Loader}
-    This loader class reads the data from a given input file and passes it into
+    The loader class reads data from a given input file and passes it into
     a pipe object, which goes to the GPU manager. We use the GDAL libraries to
-    read files from disk because it optimized on raster data files. The data is
+    read files from disk because it is optimized on raster data files. The data is
     formatted row by row into Numpy arrays and then passed to the GPU manager.
     We chose to have a single row of data be our transfer unit because it makes
     both the loader and the GPU kernel easier to understand than if we tried to
@@ -624,8 +625,9 @@ be more accessible to the GIS community.
     Originally, we pulled lines from the file with GDAL one by one, matching
     how we send one row at a time through the pipe. However, we found that this
     could be made more efficient if GDAL read more rows per read call, likely
-    because fewer system calls are made that way. Empirically, we found that it
-    was optimal to cache around 30 rows at a time to be sent through the pipe.
+    because fewer system calls are made that way. Empirically, the optimal number
+    of rows to cache depends on the dimensions of the raster file. 30 rows seems
+    to be a good starting point.
 
     The QGIS plugin version also supports reading raster data from a layer loaded
     into QGIS rather than from disk. When read this way, the loader uses the QGIS
@@ -640,13 +642,13 @@ be more accessible to the GIS community.
     is designed to be robust in that it bases all of its memory management on
     the GPU card of the system it runs on. Although the kernel code is somewhat
     complex, it is designed so that one could write any algorithm based on a
-    3x3 grid of pixels to be plugged in and calculated.
+    3x3 grid of pixels to be plugged into the rest of the kernel code and calculated.
 
     The GPU manager starts by initializing the buffers which will be used to
     copy memory to and retrieve memory from the GPU. These are based on the
     available GPU memory when the process starts, so it should always saturate
     GPU memory. It then pre-compiles the GPU kernels for each requested
-    calculation on the data. Then the manager enters the main processing loop
+    calculation on the data. Finally, the manager enters the main processing loop
     where data is received and analyzed.
 
     Once the read buffer receives a page worth of data, it serially runs each
@@ -655,15 +657,17 @@ be more accessible to the GIS community.
     as many GPU cores as possible, to minimize computation time.
 
     \subsection{Saver}
-    The data saver class takes the results of the calculations done in the
-    GPU manager and saves them to disk. Similar to the data loader, the data
-    saver uses the GDAL libraries to write 30 lines at a time to a Geotiff.
+    The data saver class takes the results of the calculations done in the GPU
+    manager and saves them to disk. Similar to the data loader, the data saver
+    uses the GDAL libraries to write multiple lines at a time to a Geotiff.
+    Multiple savers can all run in parallel to save the ouputs of different
+    functions.
 
     \subsection{QGIS Plugin}
     For QGIS, we implemented a simple GUI plugin that calls our code. The plugin
     was made using the QGIS plugin builder tool to generate all of the skeleton
     code and QT creator to design the GUI. The plugin takes input and output
-    information from the use, then calls the scheduler on those parameters.
+    information from the user, then calls the scheduler on those parameters.
 
     Although there are a still a few issues, we also implemented loading data
     from a QGIs layer, rather than from disk. This separate version of the loader
@@ -687,7 +691,7 @@ tables.
     File Size & QGIS   & PyCUDA\\ \hline
     25 MB     & 5 secs & 3 secs\\ \hline
     200 Mb    & 15 secs & 6 secs\\ \hline
-    1.5 GB    & 17 mins & 3 mins\\ \hline
+    1.5 GB    & 11 mins & 3 mins\\ \hline
     8 GB      & 45 mins & 30 mins
 \end {tabular}
 
@@ -697,10 +701,10 @@ tables.
 
 \begin{tabular}{ l | c | c }
     Function    & QGIS & PyCUDA\\ \hline
-    Input       & 2:30 & 1:55\\ \hline
-    Computation & 6:00 & 1:00\\ \hline
-    Output      & 5:00 & 2:20\\ \hline
-    Total       & 14:00 & 3:35
+    Input       & 2:00 & 1:55\\ \hline
+    Computation & 5:00 & 1:00\\ \hline
+    Output      & 2:00 & 2:20\\ \hline
+    Total       & 9:00 & 3:35
 \end {tabular}
 
 \vspace{.25in}
@@ -709,40 +713,42 @@ tables.
 
 \begin{tabular}{ l | c | c }
     Function    & QGIS & PyCUDA\\ \hline
-    Input       & 2:30 & 1:55\\ \hline
-    Computation & 9:00 & 1:00\\ \hline
-    Output      & 5:00 & 2:20\\ \hline
-    Total       & 17:00 & 3:35
+    Input       & 2:00 & 1:55\\ \hline
+    Computation & 7:00 & 1:00\\ \hline
+    Output      & 2:00 & 2:20\\ \hline
+    Total       & 11:00 & 3:35
 \end {tabular}
 \vspace{0.25in}
 
-The PyCUDA version is consistently faster than QGIS when calculating hilshade for files
-of various sizes. The I/O bottleneck  can be seen in the input and output sections 
-of the second table. PyCUDA spends almost as much time dealing with disk as QGIS does which
-limits the maximum speedup from using the GPU. Output takes a much longer time because
-it has to wait for the GPU to pass data to the saver before it can start saving to disk.
-GPU computations, including CPU based memory management and took one ninth of the time 
-required to do the same thing in QGIS. Most of this time is spent sending or receiving data,
-once the information is on the card the GPU finishes extremely quickly. Including moving data 
-to and from the card, the accumulated execution time for the GPU was less than 2 seconds. 
-Both slope and hillshade are calculated in almost the same time by the GPU, showing that 
-it isn't being significantly taxed by the more complicated formula and could easily do more work.
-A processs that required hundreds or thousands of computations per element would be
-perfect for adaptation onto GPU processing. Testing showed that even computing 
-hillshade several hundred times on each pixel didn't increase the time needed to finish.
+The PyCUDA version is consistently faster than QGIS when calculating hillshade
+for files of various sizes. The I/O bottleneck  can be seen in the input and
+output sections of the second table. PyCUDA spends almost as much time dealing
+with disk as QGIS does which limits the maximum speedup from using the GPU.
+Output takes a much longer time because it has to wait for the GPU to pass data
+to the saver before it can start saving to disk.  GPU computations, including
+CPU based memory management took one ninth of the time required to do the
+same thing in QGIS. Most of this time is spent sending or receiving data, once
+the information is on the card the GPU finishes extremely quickly. Including
+moving data to and from the card, the accumulated execution time for the GPU
+was less than 2 seconds.  Both slope and hillshade are calculated in almost the
+same time by the GPU, showing that it isn't being significantly taxed by the
+more complicated formula and could easily do more work.  A process that
+required hundreds or thousands of computations per element would be perfect for
+adaptation onto GPU processing. Testing showed that even computing hillshade
+several hundred times on each pixel didn't increase the time needed to finish.
 
 
 \section{Conclusion}
 We have developed a PyCUDA based, open source raster calculation tool that can
 run either from the command line or as a plugin for QGIS. The plugin ensures
 that neither memory on the host device or GPU will be overpopulated, and
-utilizes multithreading so that I/O and GPU computation can occur
+utilizes multiprocessing so that I/O and GPU computation can occur
 simultaneously. The underlying code was written to be easy to read and modify
 so that others can easily use it, read it, learn from it, and modify it. File
 I/O is encapsulated separately from GPU calculations so that the I/O model is
 easy to understand and modify. By default, our tool can perform slope, aspect,
 and hillshade calculations. Our results show that our raster calculation
-implementations 2-3x faster than the serial ones typically used by QGIS, and
+implementations are 3-5x faster than the serial ones typically used by QGIS, and
 that the performance gap widens for larger files and more complex calculations.
 The greatest bottleneck in our program is data I/O transfer between the disk,
 main memory, and GPU memory, as even for files in the tens of GB, GPU
@@ -758,7 +764,7 @@ computation.  Our tool only allows for independent raster computations based on
 a 3x3 grid around a given cell, however, with relatively little change, this
 could be extended to larger grids, like 5x5 or greater.  The GPU could also be
 used to different kinds of computation altogether with multiple kernels, such
-as analysis on raster data where each computation may have depenency on
+as analysis on raster data where each computation may have dependency on
 another, or even analysis on vector data.
 
 The plugin currently has minimal integration with QGIS. Aside from being able
@@ -771,7 +777,7 @@ optimizing I/O and exploring new I/O methods and/or models could significantly
 improve run time. While our model supports asynchronous I/O and computation to
 some extent, in reality the vast majority of the time the GPU isn't utilized
 while it is waiting for data to be loaded. However, using faster methods to
-improve I/O may lead to more complex code that is both more difficult to read,
+improve I/O may lead to more complex code that is more difficult to read,
 write, debug, and modify, so this trade off must be considered if one desires
 their code to be easily usable in the open source community.
 

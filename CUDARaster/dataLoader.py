@@ -181,3 +181,5 @@ class dataLoader(Process):
         print "Input file loaded from disk"
         self.logfile.flush()
 
+if __name__=="__main__":
+    pass
