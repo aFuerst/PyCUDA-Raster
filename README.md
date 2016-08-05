@@ -9,9 +9,8 @@ a CUDA enabled GPU for raster calculations. Currently supports calculating slope
 aspect, and hillshade from an elevation file.
 
 ## Status
-QGIS plugin is still in development, mosty untested and is unstable.
-The command line scheduler supports calculating aspect, slope and 
-hillshade on ESRI ascii and GEOTiff files.
+Command line tool, and stand-alone GUI work on both Windows and Linux with proper
+dependencies installed. The QGIS plugin is currently only compatible with Linux.
 
 ##Dependencies
 
@@ -28,7 +27,11 @@ hillshade on ESRI ascii and GEOTiff files.
 
 [PyCUDA](https://mathema.tician.de/software/pycuda/)
 
+[PyQt4](https://wiki.python.org/moin/PyQt) (Only needed for stand-alone GUI version)
+
 This list may not include all of the dependencies the above programs require.
+Instructions on where to download dependedncies from and some installation tips
+are in Setup-instructions.txt.
 
 The gpustruct class included here was taken from another 
 [git repo.](https://github.com/compmem/cutools)
