@@ -2,7 +2,7 @@ from osgeo import gdal
 from gdalconst import *
 from multiprocessing import Process, Pipe
 import struct
-import numpy as np
+from numpy import float32
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -147,14 +147,14 @@ class dataLoader(Process):
                     line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,remaining,buf_type=self.dataType)
                     f=struct.unpack(self.unpackVal*remaining, line_tup)
                     for line in range(remaining):
-                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
+                        self.output_pipe.send(float32(f[line*self.totalCols:self.totalCols]))
                     
                 # read in as many rows as read_rows indicates
                 else:
                     line_tup = self.open_raster_band.ReadRaster(0, line_num, self.totalCols, self.read_rows, buf_type=self.dataType)
                     f=struct.unpack(self.unpackVal*self.read_rows, line_tup)
                     for line in range(self.read_rows):
-                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
+                        self.output_pipe.send(float32(f[line*self.totalCols:self.totalCols]))
             # EOF
             except RuntimeError as e:
                 print e
@@ -170,5 +170,4 @@ class dataLoader(Process):
         self._getLines()
         self.output_pipe.close()
         print "Input file loaded from disk"
-
 
