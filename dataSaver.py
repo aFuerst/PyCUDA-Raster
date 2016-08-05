@@ -137,7 +137,6 @@ class dataSaver(Process):
         arr = np.ndarray(shape=(self.write_rows, self.totalCols), dtype=np.float32)
         np_write_arr = [i for i in range(self.totalCols)]
         while nrows < self.totalRows:
-            #arr = []
             # remaining rows < write_rows, only write in as many as are extra
             if nrows + self.write_rows >= self.totalRows:
                 rem = self.totalRows - nrows
