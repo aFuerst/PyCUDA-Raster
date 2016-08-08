@@ -1,5 +1,4 @@
 import dataLoader, gpuCalc, dataSaver
-import numpy as np
 from multiprocessing import Process, Pipe, active_children
 from time import sleep, time
 
@@ -23,7 +22,7 @@ email                : fuersta1@xavier.edu, ckazer1@swarthmore.edu, whoffman1@gu
 
 #NOTE: USAGE: scheduler.py input output_1 func_1 output_2 func_2 ... output_n func_n
 
-def run(inputFile, outputFiles, functions, disk_rows = 50):
+def run(inputFile, outputFiles, functions, disk_rows = 15):
     start = time()
     # create input and output pipes    
     inputPipe = Pipe()
@@ -32,42 +31,53 @@ def run(inputFile, outputFiles, functions, disk_rows = 50):
         outputPipes.append(Pipe())
 
     loader = dataLoader.dataLoader(inputFile, inputPipe[0], disk_rows)
+    loader.start()
     header = loader.getHeaderInfo()
+
     calc = gpuCalc.GPUCalculator(header, inputPipe[1], map((lambda x: x[0]), outputPipes), functions)
+    calc.start()
+    
     savers = []
     for i in range(len(outputFiles)):
         savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1], disk_rows))
 
     # start all threads
-    loader.start()
-    calc.start()
     for i in range(len(outputFiles)):
         savers[i].start()
 
     # join all threads
-    while active_children():
-        if loader.exitcode != None and loader.exitcode != 0:
-            print "Error encountered in data loader, ending tasks"            
-            calc.stop()
-            for saver in savers:
-                saver.stop()
-            break
-        if calc.exitcode != None and calc.exitcode != 0:
+    try:
+        while active_children():
+            if loader.exitcode != None and loader.exitcode != 0:
+                print "Error encountered in data loader, ending tasks"            
+                calc.stop()
+                for saver in savers:
+                    saver.stop()
+                break
+            if calc.exitcode != None and calc.exitcode != 0:
+                loader.stop()
+                for saver in savers:
+                    saver.stop()
+                print "Error encountered in GPU calculater, ending tasks"
+                break
+            sleep(1)    
+        total = time() - start
+        print "Total time: %d mins, %f secs" % (total / 60, total % 60)
+    except: # if anything crashes stop the rest of threads
+        if loader.exitcode != None:
             loader.stop()
-            for saver in savers:
+        if calc.exitcode != None:
+            calc.stop()
+        for saver in savers:
+            if saver.exitcode != None:
                 saver.stop()
-            print "Error encountered in GPU calculater, ending tasks"
-            break
-        sleep(1)    
-    total = time() - start
-    print "Total time: %d mins, %f secs" % (total / 60, total % 60)
 
 if __name__ == '__main__':
     #If run from the command line, parse arguments.
     from sys import argv
     outFiles = []
     funcs = []
-    disk_rows = 50
+    disk_rows = 15  # ~15 appears to be optimal number of rows to read at a time for any file
     for i in range(2,len(argv), 2):
         outFiles.append(argv[i])
         funcs.append(argv[i+1].lower())

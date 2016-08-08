@@ -2,7 +2,7 @@ from osgeo import gdal
 from gdalconst import *
 from multiprocessing import Process, Pipe
 import struct
-from numpy import float32
+from numpy import float32, frombuffer
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}
@@ -47,10 +47,19 @@ class dataLoader(Process):
         self._openFile()
         self._readHeaderInfo()
         self._closeFile()
-        
+
+    #--------------------------------------------------------------------------#
+
+    """
+    _closeFile
+
+    closes open GDAL file
+    """ 
     def _closeFile(self):
         self.open_file = None
         self.open_raster_band = None
+
+    #--------------------------------------------------------------------------#
 
     """
     getHeaderInfo
@@ -61,6 +70,8 @@ class dataLoader(Process):
     """
     def getHeaderInfo(self):
         return self.totalCols, self.totalRows, self.cellsize, self.NODATA, self.xllcorner, self.yllcorner, self.GeoT, self.prj
+
+    #--------------------------------------------------------------------------#
 
     """
     _readHeaderInfo
@@ -79,6 +90,8 @@ class dataLoader(Process):
             self.cellsize = self.GeoT[1]
         self.totalRows = self.open_raster_band.YSize
         self.totalCols = self.open_raster_band.XSize
+
+    #--------------------------------------------------------------------------#
   
     """
     _openFile
@@ -89,7 +102,7 @@ class dataLoader(Process):
         self.open_file = gdal.Open(self.file_name, GA_ReadOnly)
         self.open_raster_band = self.open_file.GetRasterBand(1)
         self.dataType = self.open_raster_band.DataType
-        self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
+        #self.unpackVal = fmttypes[gdal.GetDataTypeName(self.dataType)]*self.open_raster_band.XSize
         if ".asc" in self.file_name:
             self.file_type = "asc"
         elif ".tif" in self.file_name:
@@ -98,6 +111,8 @@ class dataLoader(Process):
             print "Unsupported file type"
             self.stop()
 
+    #--------------------------------------------------------------------------#
+
     """
     getFileType
 
@@ -105,6 +120,8 @@ class dataLoader(Process):
     """
     def getFileType(self):
         return self.file_type
+
+    #--------------------------------------------------------------------------#
 
     """
     stop 
@@ -119,6 +136,8 @@ class dataLoader(Process):
         self.output_pipe.close()
         exit(1)
 
+    #--------------------------------------------------------------------------#
+
     """
     run
 
@@ -127,6 +146,8 @@ class dataLoader(Process):
     def run(self):
         self._openFile()
         self._loadFunc()
+
+    #--------------------------------------------------------------------------#
 
     """
     _getLines
@@ -145,21 +166,22 @@ class dataLoader(Process):
                 if line_num + self.read_rows >= self.totalRows:
                     remaining = self.totalRows - line_num
                     line_tup = self.open_raster_band.ReadRaster(0,line_num,self.totalCols,remaining,buf_type=self.dataType)
-                    f=struct.unpack(self.unpackVal*remaining, line_tup)
-                    for line in range(remaining):
-                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
-                    
+                    for line in range(remaining-1):
+                        self.output_pipe.send(frombuffer(line_tup[(line*self.totalCols*4): (line*self.totalCols + self.totalCols)*4], dtype=float32))
+                    return
                 # read in as many rows as read_rows indicates
                 else:
                     line_tup = self.open_raster_band.ReadRaster(0, line_num, self.totalCols, self.read_rows, buf_type=self.dataType)
-                    f=struct.unpack(self.unpackVal*self.read_rows, line_tup)
                     for line in range(self.read_rows):
-                        self.output_pipe.send(np.float64(f[line*self.totalCols:][:self.totalCols]))
+                        self.output_pipe.send(frombuffer(line_tup[(line*self.totalCols*4): (line*self.totalCols + self.totalCols)*4], dtype=float32))
             # EOF
             except RuntimeError as e:
                 print e
                 return
             line_num += self.read_rows
+        print "finished reading rows"
+
+    #--------------------------------------------------------------------------#
 
     """
     _loadFunc
@@ -171,4 +193,6 @@ class dataLoader(Process):
         self.output_pipe.close()
         print "Input file loaded from disk"
 
+if __name__=="__main__":
+    pass
 

@@ -39,35 +39,29 @@ class GPUCalculator(Process):
     def __init__(self, header, _input_pipe, _output_pipes, function_types):
         Process.__init__(self)
 
-        # CUDA device info
-        #self.device = None
-        #self.context = None
-
         self.input_pipe = _input_pipe
         self.output_pipes = _output_pipes 
         self.functions = function_types
-    
+        self.header = header
+
+    #--------------------------------------------------------------------------#
+
+    """
+    _unpackInfo
+
+    gets data from header and creates carry_over_rows needed in _processData
+    """
+    def _unpackInfo(self):
         #unpack header info
-        self.totalCols = header[0]
-        self.totalRows = header[1]
-        self.cellsize = header[2]
-        self.NODATA = header[3]
-
-        # memory information
-        #self.to_gpu_buffer = None
-        #self.from_gpu_buffer = None
-        #self.data_gpu = None
-        #self.result_gpu = None
-
-        #CUDA kernel to be run
-        #self.kernel = None
-        #self.func = None
+        self.totalCols = self.header[0]
+        self.totalRows = self.header[1]
+        self.cellsize = self.header[2]
+        self.NODATA = self.header[3]
 
         #carry over rows used to insert last two lines of data from one page
         #as first two lines in next page
-        self.carry_over_rows = [np.zeros(self.totalCols), np.zeros(self.totalCols)]
-        self.carry_over_rows[0].fill(self.NODATA)
-        self.carry_over_rows[1].fill(self.NODATA)
+        self.carry_over_rows = [np.full(shape=self.totalCols, fill_value=self.NODATA, dtype=np.float32) \
+        , np.empty(shape=self.totalCols, dtype=np.float32)] # second array does not need to be filled with NODATA
         self.np_copy_arr = [i for i in range(self.totalCols)]
 
     #--------------------------------------------------------------------------#
@@ -82,10 +76,8 @@ class GPUCalculator(Process):
     does CUDA initialization and sets local device and context
     """
     def run(self):
-        cuda.init()
-        self.device = cuda.Device(0)
-        self.context = self.device.make_context()
-
+        import pycuda.autoinit
+        self._unpackInfo()
         self._gpuAlloc()
 
         # pre-compile requested kernels outside loop, only do it once this way
@@ -133,8 +125,8 @@ class GPUCalculator(Process):
     """
     def _gpuAlloc(self):
         #Get GPU information
-        self.freeMem = cuda.mem_get_info()[0] * .5 * .8
-        self.maxPossRows = np.int(np.floor(self.freeMem / (4 * self.totalCols)))
+        self.freeMem = cuda.mem_get_info()[0] * .5 * .8 # limit memory use to 80% of available
+        self.maxPossRows = np.int(np.floor(self.freeMem / (4 * self.totalCols)))    # multiply by 4 as that is size of float
         # set max rows to smaller number to save memory usage
         if self.totalRows < self.maxPossRows:
             print "reducing max rows to reduce memory use on GPU"
@@ -168,26 +160,32 @@ class GPUCalculator(Process):
             np.put(self.to_gpu_buffer[1], self.np_copy_arr, self.carry_over_rows[1])
             row_count = 2
 
-        #Receive a page of data from buffer
-        while row_count <  self.maxPossRows:
-            if count + row_count > self.totalRows:
-                # end of file reached                 
-                self.to_gpu_buffer[row_count].fill(self.NODATA)
-                return False
-            else:
-                try:
+        if count + row_count + self.maxPossRows > self.totalRows and row_count > 1: # this is the last page
+            try:
+                while row_count + count < self.totalRows: # get rest of rows from pipe
                     np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, self.input_pipe.recv())
-                #Pipe was closed unexpectedly
-                except EOFError:
-                    print "Pipe closed unexpectedly."
-                    self.stop()
-            row_count += 1
-            
-        #Update carry over rows
-        np.put(self.carry_over_rows[0], self.np_copy_arr, self.to_gpu_buffer[self.maxPossRows-2])
-        np.put(self.carry_over_rows[1], self.np_copy_arr, self.to_gpu_buffer[self.maxPossRows-1])
+                    row_count += 1
+            #Pipe was closed unexpectedly
+            except EOFError:
+                print "Pipe closed unexpectedly."
+                self.stop()
+            self.to_gpu_buffer[row_count].fill(self.NODATA)
+            return False # finished receiving data, tell run to end
 
-        return True # not finished reveiving data, tell run to keep looping
+        else: # this is not the last page
+            try:        
+                while row_count < self.maxPossRows: # get max poss rows from pipe
+                    np.put(self.to_gpu_buffer[row_count], self.np_copy_arr, self.input_pipe.recv())
+                    row_count += 1
+            #Pipe was closed unexpectedly
+            except EOFError:
+                print "Pipe closed unexpectedly."
+                self.stop()              
+            #Update carry over rows
+            np.put(self.carry_over_rows[0], self.np_copy_arr, self.to_gpu_buffer[self.maxPossRows-2])
+            np.put(self.carry_over_rows[1], self.np_copy_arr, self.to_gpu_buffer[self.maxPossRows-1])
+
+            return True # not finished reveiving data, tell run to keep looping
 
     #--------------------------------------------------------------------------#
 
@@ -206,7 +204,7 @@ class GPUCalculator(Process):
         pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)    
 
         # minimize work by each thread while makeing sure each pixel is calculated   
-        while pixels_per_thread < 1:
+        while pixels_per_thread < 3:
             grid = (grid[0] - 16,grid[1] - 16)
             num_blocks = grid[0] * grid[1]
             pixels_per_thread = (self.maxPossRows * self.totalCols) / (threads_per_block * num_blocks)
@@ -214,12 +212,12 @@ class GPUCalculator(Process):
         
         #information struct passed to GPU
         stc = GPUStruct([
-            (np.float64, 'pixels_per_thread', pixels_per_thread),
+            (np.uint64, 'pixels_per_thread', pixels_per_thread),
             (np.float64, 'NODATA', self.NODATA),
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
-            (np.float64, 'cellSize', self.cellsize)
+            (np.float32, 'cellSize', self.cellsize)
             ])
 
         stc.copy_to_gpu()
@@ -234,9 +232,11 @@ class GPUCalculator(Process):
     Writes results to output pipe. This pipe goes to dataSaver.py
     """
     def _writeData(self, count, out_pipe):
-        for row in range(1, self.maxPossRows-1):
-            if count + row > self.totalRows:
-                return
+        if count + (self.maxPossRows-1) > self.totalRows:
+            r = self.totalRows - (count-1)
+        else:
+            r = self.maxPossRows-1
+        for row in range(1, r):
             out_pipe.send(self.from_gpu_buffer[row])
  
     #--------------------------------------------------------------------------#
@@ -387,7 +387,8 @@ class GPUCalculator(Process):
                 """)
         else:
             print "Function %s not implemented" % func
-            raise NotImplementedError
+            self.stop()
+            #raise NotImplementedError
 
     #--------------------------------------------------------------------------#
 
@@ -495,4 +496,6 @@ class GPUCalculator(Process):
                     """)
         return mod
 
+if __name__=="__main__":
+    pass
 
