@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from multiprocessing import Process, Pipe
 import numpy as np
 from os.path import exists

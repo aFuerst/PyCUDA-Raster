@@ -50,50 +50,21 @@ def run(inputFile, outputFiles, functions, disk_rows = 20):
         outputPipes = []
         for i in range(len(outputFiles)):
             outputPipes.append(Pipe())
-        logfile.write("made pipes\n")
-        logfile.flush()
-        print type(inputFile)
 
-        if type(inputFile) is unicode or type(inputFile) is str:
-            logfile.write("loading from disk\n")
-            logfile.flush()
-            print "loading from disk"
-            loader = dataLoader.dataLoader(inputFile, inputPipe[0], disk_rows)
-        else:
-            print "loading from qgis"
-            logfile.write("loading from qgis\n")
-            logfile.flush()
-            loader = layerLoader.layerLoader(inputFile, inputPipe[0])
-
-        logfile.write("made loader\n")    
-        logfile.flush()
+        loader = dataLoader.dataLoader(inputFile, inputPipe[0], disk_rows)
+        loader.start()
         header = loader.getHeaderInfo()
-        print header
-        logfile.write(str(header) + "\n")
 
-        logfile.write("got header info\n")
-        logfile.flush()
         calc = gpuCalc.GPUCalculator(header, inputPipe[1], map((lambda x: x[0]), outputPipes), functions)
-        logfile.write("made gpu calc\n")
-
+        calc.start()
+        
         savers = []
         for i in range(len(outputFiles)):
             savers.append(dataSaver.dataSaver(outputFiles[i], header, outputPipes[i][1], disk_rows))
-        logfile.write("made saver threads\n")
-        logfile.flush()
 
         # start all threads
-        loader.start()
-        logfile.write("started loader\n")
-        logfile.flush()
-
-        calc.start()
-        logfile.write("started gpuCalc\n")
-        logfile.flush()
-
         for i in range(len(outputFiles)):
             savers[i].start()
-        logfile.write("started savers\n")
 
         # join all threads
         while active_children():

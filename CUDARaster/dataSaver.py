@@ -52,26 +52,39 @@ class dataSaver(Process):
         self.file_name = _output_file 
         self.input_pipe = _input_pipe
         self.write_rows = _disk_rows
+        self.header = header
         self.log("done init")
 
+    """
+    _unpackHeader
+    
+    Puts header info into class vars
+    """
+    def _unpackHeader(self):
         #unpack header info
-        self.totalCols = header[0]
-        self.totalRows = header[1]
-        self.cellsize = header[2]
-        self.NODATA = header[3]
-        self.xllcorner = header[4]
-        self.yllcorner = header[5]
-        self.GeoT = header[6]
-        self.prj = header[7]
-        self.log((header))
+        self.totalCols = self.header[0]
+        self.totalRows = self.header[1]
+        self.cellsize = self.header[2]
+        self.NODATA = self.header[3]
+        self.xllcorner = self.header[4]
+        self.yllcorner = self.header[5]
+        self.GeoT = self.header[6]
+        self.prj = self.header[7] 
+        self.log(self.header)
+
+    #--------------------------------------------------------------------------#
 
     def log(self, message):
         self.logfile.write(str(message) + '\n')
         print str(message)
         #self.logfile.flush()
 
+    #--------------------------------------------------------------------------#
+
     def __del__(self):
         pass
+
+    #--------------------------------------------------------------------------#
 
     """
     run
@@ -80,10 +93,13 @@ class dataSaver(Process):
     a progress bar
     """
     def run(self):
+        self._unpackHeader()
         self._openFile()
         self._gui()
         self._writeFunc()
         self._closeFile()
+
+    #--------------------------------------------------------------------------#
 
     """
     _gui
@@ -97,6 +113,8 @@ class dataSaver(Process):
         self.lb.pack(side="top", fill="x")
         self.pb.pack(side="bottom", fill="x")
 
+    #--------------------------------------------------------------------------#
+
     """
     _closeFile
 
@@ -106,6 +124,7 @@ class dataSaver(Process):
         self.dataset.FlushCache()
         self.dataset = None
 
+    #--------------------------------------------------------------------------#
 
     """
     stop
@@ -120,6 +139,8 @@ class dataSaver(Process):
         self.logfile.flush()
         exit(1)
 
+    #--------------------------------------------------------------------------#
+
     """
     _openFile
 
@@ -131,7 +152,7 @@ class dataSaver(Process):
             self.log(self.file_name + " already exists. Deleting it...")
             os.remove(self.file_name)
         self.driver = gdal.GetDriverByName('GTiff')
-        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32, options = ['COMPRESS=DEFLATE', 'NUM_THREADS=2', 'BIGTIFF=IF_NEEDED'])
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32, options = ['COMPRESS=DEFLATE', 'NUM_THREADS=2', 'BIGTIFF=YES'])
         self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
         self.dataset.SetGeoTransform(self.GeoT)
         try:
@@ -139,6 +160,8 @@ class dataSaver(Process):
         except RuntimeError:
             print "Warning: Invalid projection."
             self.dataset.SetProjection('')
+
+    #--------------------------------------------------------------------------#
 
     """
     _writeFunc
@@ -155,29 +178,29 @@ class dataSaver(Process):
             if nrows + self.write_rows >= self.totalRows:
                 rem = self.totalRows - nrows
                 arr.resize((rem, self.totalCols))
-                for row in range(rem):
-                    try:
-                        np.put(arr, np_write_arr, self.input_pipe.recv())
-                    except EOFError:
-                        print "Pipe closed unexpectedly"
-                        self.stop()
+                try:
+                    for row in range(rem):
+                        np.put(arr[row], np_write_arr, self.input_pipe.recv())
+                except EOFError:
+                    self.log("Pipe closed unexpectedly")
+                    self.stop()
             else:
                 # write in as many rows as write_rows indicates
-                for row in range(self.write_rows):
-                    try:
-                        np.put(arr, np_write_arr, self.input_pipe.recv())
-                    except EOFError:
-                        print "Pipe closed unexpectedly"
-                        self.stop()
+                try:
+                    for row in range(self.write_rows):
+                        np.put(arr[row], np_write_arr, self.input_pipe.recv())
+                except EOFError:
+                    self.log("Pipe closed unexpectedly")
+                    self.stop()
             # write out rows
             self.dataset.GetRasterBand(1).WriteArray(arr, 0, nrows)
             nrows+=self.write_rows
             self.pb.step(self.write_rows)
             self.rt.update()
         # write out remaining lines
-        print "Flushing out remaining data for %s" % self.file_name
         self.dataset.FlushCache()
         self.log("Output %s written to disk" % self.file_name)
 
 if __name__=="__main__":
     pass
+
