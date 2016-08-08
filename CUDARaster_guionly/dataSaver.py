@@ -134,13 +134,16 @@ class dataSaver(Process):
     """
     def _writeFunc(self):
         nrows = 0
-        while nrows < self.totalRows: 
-            arr = []
+        arr = np.ndarray(shape=(self.write_rows, self.totalCols), dtype=np.float32)
+        np_write_arr = [i for i in range(self.totalCols)]
+        while nrows < self.totalRows:
             # remaining rows < write_rows, only write in as many as are extra
             if nrows + self.write_rows >= self.totalRows:
-                for row in range(self.totalRows - nrows):
+                rem = self.totalRows - nrows
+                arr.resize((rem, self.totalCols))
+                for row in range(rem):
                     try:
-                        arr.append(self.input_pipe.recv())
+                        np.put(arr, np_write_arr, self.input_pipe.recv())
                     except EOFError:
                         print "Pipe closed unexpectedly"
                         self.stop()
@@ -148,12 +151,12 @@ class dataSaver(Process):
                 # write in as many rows as write_rows indicates
                 for row in range(self.write_rows):
                     try:
-                        arr.append(self.input_pipe.recv())
+                        np.put(arr, np_write_arr, self.input_pipe.recv())
                     except EOFError:
                         print "Pipe closed unexpectedly"
                         self.stop()
             # write out rows
-            self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
+            self.dataset.GetRasterBand(1).WriteArray(arr, 0, nrows)
             nrows+=self.write_rows
             #self.pb.step(self.write_rows)
             #self.rt.update()

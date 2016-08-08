@@ -7,7 +7,7 @@ from qgis.gui import *
 from qgis.utils import iface
 
 from math import isnan
-import numpy as np
+from numpy import float32, float64
 
 from multiprocessing import Process, Pipe
 import struct, os, os.path
@@ -63,7 +63,7 @@ class layerLoader(Process):
         s = self.layer.metadata()
         loc = s.find("No Data Value</p>\n<p>") + len("No Data Value</p>\n<p>")
         loc2 = s.find("<", loc)
-        self.NODATA = np.float64(s[loc:loc2])
+        self.NODATA = float64(s[loc:loc2])
         self.prj = self.layer.crs().toWkt()
         self.GeoT = (self.xllcorner, self.layer.rasterUnitsPerPixelX(), 0, self.yllcorner, 0, self.layer.rasterUnitsPerPixelY())
         self.log("done header info")
@@ -79,8 +79,8 @@ class layerLoader(Process):
             if isnan(self.d.value(row,x)): 
                 self.log("illegal value, breaking, (" + str(x) + ", " + str(row) + ")")
                 self.stop()
-            arr.append( self.d.value(row,x))
-        return np.float64(arr)
+            arr.append(self.d.value(row,x))
+        return float32(arr)
 
     def getFileType(self):
         return "tif" 

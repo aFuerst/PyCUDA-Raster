@@ -2,7 +2,7 @@ from osgeo import gdal
 from gdalconst import *
 from multiprocessing import Process, Pipe
 import struct
-import numpy as np
+from numpy import float32
 
 gdal.UseExceptions()
 fmttypes = {'Byte':'B', 'UInt16':'H', 'Int16':'h', 'UInt32':'I', 'Int32':'i', 'Float32':'f', 'Float64':'d'}

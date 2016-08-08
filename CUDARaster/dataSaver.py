@@ -131,7 +131,7 @@ class dataSaver(Process):
             self.log(self.file_name + " already exists. Deleting it...")
             os.remove(self.file_name)
         self.driver = gdal.GetDriverByName('GTiff')
-        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32)
+        self.dataset = self.driver.Create(self.file_name, self.totalCols, self.totalRows, 1, gdal.GDT_Float32, options = ['COMPRESS=DEFLATE', 'NUM_THREADS=2', 'BIGTIFF=IF_NEEDED'])
         self.dataset.GetRasterBand(1).SetNoDataValue(self.NODATA)
         self.dataset.SetGeoTransform(self.GeoT)
         try:
@@ -148,26 +148,29 @@ class dataSaver(Process):
     """
     def _writeFunc(self):
         nrows = 0
-        while nrows < self.totalRows: 
-            arr = []
+        arr = np.ndarray(shape=(self.write_rows, self.totalCols), dtype=np.float32)
+        np_write_arr = [i for i in range(self.totalCols)]
+        while nrows < self.totalRows:
             # remaining rows < write_rows, only write in as many as are extra
             if nrows + self.write_rows >= self.totalRows:
-                for row in range(self.totalRows - nrows):
+                rem = self.totalRows - nrows
+                arr.resize((rem, self.totalCols))
+                for row in range(rem):
                     try:
-                        arr.append(self.input_pipe.recv())
+                        np.put(arr, np_write_arr, self.input_pipe.recv())
                     except EOFError:
-                        self.log("Pipe closed unexpectedly")
+                        print "Pipe closed unexpectedly"
                         self.stop()
             else:
                 # write in as many rows as write_rows indicates
                 for row in range(self.write_rows):
                     try:
-                        arr.append(self.input_pipe.recv())
+                        np.put(arr, np_write_arr, self.input_pipe.recv())
                     except EOFError:
-                        self.log("Pipe closed unexpectedly")
+                        print "Pipe closed unexpectedly"
                         self.stop()
             # write out rows
-            self.dataset.GetRasterBand(1).WriteArray(np.float32(arr), 0, nrows)
+            self.dataset.GetRasterBand(1).WriteArray(arr, 0, nrows)
             nrows+=self.write_rows
             self.pb.step(self.write_rows)
             self.rt.update()

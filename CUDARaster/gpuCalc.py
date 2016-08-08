@@ -1,7 +1,6 @@
 from multiprocessing import Process,Pipe
 import numpy as np
 from gpustruct import GPUStruct
-
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 
@@ -43,8 +42,8 @@ class GPUCalculator(Process):
         Process.__init__(self)
 
         # CUDA device info
-        self.device = None
-        self.context = None
+        #self.device = None
+        #self.context = None
 
         self.input_pipe = _input_pipe
         self.output_pipes = _output_pipes 
@@ -57,14 +56,14 @@ class GPUCalculator(Process):
         self.NODATA = header[3]
 
         # memory information
-        self.to_gpu_buffer = None
-        self.from_gpu_buffer = None
-        self.data_gpu = None
-        self.result_gpu = None
+        #self.to_gpu_buffer = None
+        #self.from_gpu_buffer = None
+        #self.data_gpu = None
+        #self.result_gpu = None
 
         #CUDA kernel to be run
-        self.kernel = None
-        self.func = None
+        #self.kernel = None
+        #self.func = None
 
         #carry over rows used to insert last two lines of data from one page
         #as first two lines in next page
@@ -139,7 +138,7 @@ class GPUCalculator(Process):
     def _gpuAlloc(self):
         #Get GPU information
         self.freeMem = cuda.mem_get_info()[0] * .5 * .8
-        self.maxPossRows = np.int(np.floor(self.freeMem / (8 * self.totalCols)))
+        self.maxPossRows = np.int(np.floor(self.freeMem / (4 * self.totalCols)))
         # set max rows to smaller number to save memory usage
         if self.totalRows < self.maxPossRows:
             print "reducing max rows to reduce memory use on GPU"
@@ -147,8 +146,8 @@ class GPUCalculator(Process):
             #self.maxPossRows = 100
 
         # create pagelocked buffers and GPU arrays
-        self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
-        self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float64)
+        self.to_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float32)
+        self.from_gpu_buffer = cuda.pagelocked_empty((self.maxPossRows , self.totalCols), np.float32)
         self.data_gpu = cuda.mem_alloc(self.to_gpu_buffer.nbytes)
         self.result_gpu = cuda.mem_alloc(self.from_gpu_buffer.nbytes)
 
@@ -219,12 +218,12 @@ class GPUCalculator(Process):
 
         #information struct passed to GPU
         stc = GPUStruct([
-            (np.float64, 'pixels_per_thread', pixels_per_thread),
+            (np.uint64, 'pixels_per_thread', pixels_per_thread),
             (np.float64, 'NODATA', self.NODATA),
             (np.uint64, 'ncols', self.totalCols),
             (np.uint64, 'nrows', self.maxPossRows),
             (np.uint64, 'npixels', self.maxPossRows*self.totalCols),
-            (np.float64, 'cellSize', self.cellsize)
+            (np.float32, 'cellSize', self.cellsize)
             ])
 
         stc.copy_to_gpu()
@@ -279,14 +278,16 @@ class GPUCalculator(Process):
     # and how that function should be called within the code in _getKernel.
     # 
     # Possible parameters you can use from _getKernel:
-    # dz_dx
-    # dz_dy
-    # file_info->pixels_per_thread
-    # file_info->NODATA
-    # file_info->ncols
-    # file_info->nrows
-    # file_info->npixels
-    # file_info->cellSize
+    # float *nbhd      /* this is the 3x3 grid of neighbors */
+    # float dz_dx
+    # float dz_dy
+    # unsigned long long file_info->pixels_per_thread
+    # double file_info->NODATA
+    # unsigned long long file_info->ncols
+    # unsigned long long file_info->nrows
+    # unsigned long long file_info->npixels
+    # float file_info->cellSize
+
 
     def _getRasterFunc(self, func):
         if func == "slope":
@@ -295,7 +296,7 @@ class GPUCalculator(Process):
                 /*
                     GPU only function that calculates slope for a pixel
                 */
-                __device__ double slope(double dz_dx, double dz_dy){
+                __device__ float slope(float dz_dx, float dz_dy){
                     return atan(sqrt(pow(dz_dx, 2) + pow(dz_dy, 2)));
                 }
                 """,\
@@ -309,8 +310,8 @@ class GPUCalculator(Process):
                 /*
                     GPU only function that calculates aspect for a pixel
                 */
-                __device__ double aspect(double dz_dx, double dz_dy, double NODATA){
-                    double aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
+                __device__ float aspect(float dz_dx, float dz_dy, double NODATA){
+                    float aspect = 57.29578 * (atan2(dz_dy, -(dz_dx)));
                     if(dz_dx == NODATA || dz_dy == NODATA || (dz_dx == 0.0 && dz_dy == 0.0)){
                         return NODATA;
                     } else{
@@ -335,8 +336,8 @@ class GPUCalculator(Process):
                     GPU only function that calculates aspect for a pixel
                     to be ONLY used by hillshade
                 */    
-                __device__ double hillshade_aspect(double dz_dx, double dz_dy){
-                    double aspect;
+                __device__ float hillshade_aspect(float dz_dx, float dz_dy){
+                    float aspect;
                             if(dz_dx != 0){
                                 aspect = atan2(dz_dy, -(dz_dx));
                                 if(aspect < 0){
@@ -357,25 +358,25 @@ class GPUCalculator(Process):
                 /*
                     GPU only function that calculates hillshade for a pixel
                 */
-                __device__ double hillshade(double dz_dx, double dz_dy){
+                __device__ float hillshade(float dz_dx, float dz_dy){
                     /* calc slope and aspect */
-                    double slp = slope(dz_dx, dz_dy);
-                    double asp = hillshade_aspect(dz_dx, dz_dy);
+                    float slp = slope(dz_dx, dz_dy);
+                    float asp = hillshade_aspect(dz_dx, dz_dy);
 
                     /* calc zenith */
-                        double altitude = 45;
-                        double zenith_deg = 90 - altitude;
-                        double zenith_rad = zenith_deg * (M_PI / 180.0);
+                        float altitude = 45;
+                        float zenith_deg = 90 - altitude;
+                        float zenith_rad = zenith_deg * (M_PI / 180.0);
     
                     /* calc azimuth */
-                        double azimuth = 315;
-                        double azimuth_math = (360 - azimuth + 90);
+                        float azimuth = 315;
+                        float azimuth_math = (360 - azimuth + 90);
                         if(azimuth_math >= 360.0){
                                 azimuth_math = azimuth_math - 360;
                     }	
-                    double azimuth_rad = (azimuth_math * M_PI / 180.0);
+                    float azimuth_rad = (azimuth_math * M_PI / 180.0);
 
-                    double hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
+                    float hs = 255.0 * ( ( cos(zenith_rad) * cos(slp) ) + ( sin(zenith_rad) * sin(slp) * cos(azimuth_rad - asp) ) );
 
                         if(hs < 0){
                                 return 0;
@@ -387,6 +388,9 @@ class GPUCalculator(Process):
                 """
                 hillshade(dz_dx, dz_dy)
                 """)
+        else:
+            print "Function %s not implemented" % func
+            raise NotImplementedError
 
     #--------------------------------------------------------------------------#
 
@@ -411,19 +415,20 @@ class GPUCalculator(Process):
                     #define M_PI 3.14159625
                     #endif
                     typedef struct{
-                            double pixels_per_thread;
+                            /* struct representing the relevant data passed in by host */
+                            unsigned long long pixels_per_thread;
                             double NODATA;
                             unsigned long long ncols;
                             unsigned long long nrows;
                             unsigned long long npixels;
-                            double cellSize;
+                            float cellSize;
                     } passed_in;
 
                     /************************************************************************************************
                             GPU only function that gets the neighbors of the pixel at offset
                             stores them in the passed-by-reference array 'store'
                     ************************************************************************************************/
-                    __device__ int getKernel(double *store, double *data, unsigned long offset, passed_in *file_info){
+                    __device__ int getKernel(float *store, float *data, unsigned long offset, passed_in *file_info){
                             //NOTE: This is more or less appropriated from Liam's code. Treats edge rows and columns
                             // as buffers, they will be dropped.
                             if (offset < file_info->ncols || offset >= (file_info->npixels - file_info->ncols)){
@@ -455,7 +460,7 @@ class GPUCalculator(Process):
                             handles a variable number of calculations based on its thread/block location 
                             and the size of pixels_per_thread in file_info
                     ************************************************************************************************/
-                    __global__ void raster_function(double *data, double *result, passed_in *file_info){
+                    __global__ void raster_function(float *data, float *result, passed_in *file_info){
                             /* get individual thread x,y values */
                             unsigned long long x = blockIdx.x * blockDim.x + threadIdx.x;
                             unsigned long long y = blockIdx.y * blockDim.y + threadIdx.y; 
@@ -464,7 +469,7 @@ class GPUCalculator(Process):
                             //block and thread.
                             unsigned long long i;
                             /* list to store 3x3 kernel each pixel needs to calc slope */
-                            double nbhd[9];
+                            float nbhd[9];
                             /* iterate over assigned pixels and calculate slope for all of them */
                             /* do npixels + 1 to make last row(s) get done */
                             for(i=0; i < file_info -> pixels_per_thread + 1 && offset < file_info -> npixels; ++i){	    
@@ -480,8 +485,8 @@ class GPUCalculator(Process):
                                                     nbhd[q] = data[offset];
                                                 }
                                             }
-                                            double dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8 * file_info -> cellSize);
-                                            double dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8 * file_info -> cellSize);
+                                            float dz_dx = (nbhd[2] + (2*nbhd[5]) + nbhd[8] - (nbhd[0] + (2*nbhd[3]) + nbhd[6])) / (8 * file_info -> cellSize);
+                                            float dz_dy = (nbhd[6] + (2*nbhd[7]) + nbhd[8] - (nbhd[0] + (2*nbhd[1]) + nbhd[2])) / (8 * file_info -> cellSize);
 
                                             result[offset] =""" + func_call + """;
                                         }
