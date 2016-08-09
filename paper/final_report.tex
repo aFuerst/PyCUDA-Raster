@@ -583,7 +583,7 @@ be more accessible to the GIS community.
         \caption{Snapshot of plugin GUI.}
         \label{gui}
     \end{figure}
-
+\usepackage{fancyvrb}
 \section{Implementation} \label{implementation}
     Our program is implemented primarily in Python 2.7. We chose to write the
     program in Python because it is relatively easy to read and write, and also
@@ -610,7 +610,33 @@ be more accessible to the GIS community.
     functions can be computed on a single file loaded by the data loader, and
     the scheduler will generate a different saver to individually save each
     output.
+    
+    \subsection{using fancyvrb}
+    \begin{Verbatim}[frame=single]
+    # start all threads
+    for i in range(len(outputFiles)):
+        savers[i].start()
 
+    # join all threads
+    try:
+        while active_children():
+            if loader.exitcode != None and loader.exitcode != 0:
+                print "Error encountered in data loader, ending tasks"            
+                calc.stop()
+                for saver in savers:
+                    saver.stop()
+                break
+            if calc.exitcode != None and calc.exitcode != 0:
+                loader.stop()
+                for saver in savers:
+                    saver.stop()
+                print "Error encountered in GPU calculater, ending tasks"
+                break
+            sleep(1)    
+        total = time() - start
+        print "Total time: %d mins, %f secs" % (total / 60, total % 60)
+    \end{verbatim}
+    
     \subsection{Loader}
     The loader class reads data from a given input file and passes it into
     a pipe object, which goes to the GPU manager. We use the GDAL libraries to
