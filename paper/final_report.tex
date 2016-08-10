@@ -48,7 +48,7 @@
 % \documentclass[journal]{../sty/IEEEtran}
 
 % (uncomment the ones you want to load)
-
+\usepackage{fancyvrb}
 
 % *** MISC UTILITY PACKAGES ***
 %
@@ -583,7 +583,6 @@ be more accessible to the GIS community.
         \caption{Snapshot of plugin GUI.}
         \label{gui}
     \end{figure}
-\usepackage{fancyvrb}
 \section{Implementation} \label{implementation}
     Our program is implemented primarily in Python 2.7. We chose to write the
     program in Python because it is relatively easy to read and write, and also
@@ -611,32 +610,28 @@ be more accessible to the GIS community.
     the scheduler will generate a different saver to individually save each
     output.
     
-    \subsection{using fancyvrb}
-    \begin{Verbatim}[frame=single]
-    # start all threads
-    for i in range(len(outputFiles)):
-        savers[i].start()
-
+    \begin{Verbatim}[frame=single, gobble=4]
     # join all threads
-    try:
-        while active_children():
-            if loader.exitcode != None and loader.exitcode != 0:
-                print "Error encountered in data loader, ending tasks"            
-                calc.stop()
-                for saver in savers:
-                    saver.stop()
-                break
-            if calc.exitcode != None and calc.exitcode != 0:
-                loader.stop()
-                for saver in savers:
-                    saver.stop()
-                print "Error encountered in GPU calculater, ending tasks"
-                break
-            sleep(1)    
-        total = time() - start
-        print "Total time: %d mins, %f secs" % (total / 60, total % 60)
-    \end{verbatim}
-    
+    while active_children():
+      if  loader.exitcode != 0:
+       print "Error encountered in loader"            
+       calc.stop()
+       for saver in savers:
+        saver.stop()
+       break
+      if calc.exitcode != 0:
+       loader.stop()
+       for saver in savers:
+        saver.stop()
+       print "Error encountered in GPU"
+       break
+      sleep(1)    
+    total = time() - start
+    print "Total time: %d mins, %f secs" \
+        % (total / 60, total % 60)
+    \end{Verbatim}
+    \break
+
     \subsection{Loader}
     The loader class reads data from a given input file and passes it into
     a pipe object, which goes to the GPU manager. We use the GDAL libraries to
@@ -654,6 +649,15 @@ be more accessible to the GIS community.
     because fewer system calls are made that way. Empirically, the optimal number
     of rows to cache depends on the dimensions of the raster file. 30 rows seems
     to be a good starting point.
+
+\begin{Verbatim}[frame=single, gobble=2]
+   data = openRaster.read(0, line_num, 
+	      cols, rows, buf_type=dataType)
+   ext=struct.unpack(unpackVal*rows, data)
+   for line in range(rows):
+    output_pipe.send(float32(
+	     ext[line*cols:][:cols]))
+\end{Verbatim}
 
     The QGIS plugin version also supports reading raster data from a layer loaded
     into QGIS rather than from disk. When read this way, the loader uses the QGIS
@@ -682,12 +686,54 @@ be more accessible to the GIS community.
     for each kernel to a different saver. Each kernel is scheduled to run on
     as many GPU cores as possible, to minimize computation time.
 
+    \begin{Verbatim}[frame=single, gobble=8]
+        grd = (256,256)
+        blk = (32,32,1)
+        blocks = grd[0] * grd[1]
+        threads = blk[0]*blk[1]*blk[2]
+	# pixels per threas
+        ppt = (rows * cols) / (threads * blocks)    
+
+        # minimize work by each thread]
+        while ppt < 3:
+         grd = (grd[0] - 16,grd[1] - 16)
+         blocks = grd[0] * grd[1]
+         ppt = (rows * cols)/(threads * blocks)
+        ppt = np.ceil(ppt)   
+        
+        #information struct passed to GPU
+        stc = GPUStruct([
+         (np.uint64, 'ppt', ppt),
+         (np.float64, 'NODATA', NODATA),
+         (np.uint64, 'ncols', cols),
+         (np.uint64, 'nrows', rown),
+         (np.uint64, 'npixels', rows*cols),
+         (np.float32, 'cellSize', cellsize)
+         ])
+
+        stc.copy_to_gpu()
+        #Call GPU kernel
+        func(data_gpu, result_gpu, stc, blk, grd)
+\end{Verbatim}
+
     \subsection{Saver}
     The data saver class takes the results of the calculations done in the GPU
     manager and saves them to disk. Similar to the data loader, the data saver
     uses the GDAL libraries to write multiple lines at a time to a Geotiff.
     Multiple savers can all run in parallel to save the ouputs of different
     functions.
+\break
+    \begin{Verbatim}[frame=single, gobble=4]
+    try:
+     for row in range(self.write_rows):
+      np.put(out_arr[row], input_pipe.recv())
+    except EOFError:
+      print "Pipe closed unexpectedly"
+       self.stop()
+    # write out rows
+    dataset.WriteArray(out_arr, 0, nrows)
+\end{Verbatim}
+
 
     \subsection{QGIS Plugin}
     For QGIS, we implemented a simple GUI plugin that calls our code. The plugin
@@ -701,6 +747,16 @@ be more accessible to the GIS community.
     memory, it should load values faster than from disk. The QGIS loader still
     sends one row of data at a time through a pipe, so no changes are needed
     for it to work with the GPU manager or data saver.
+
+\begin{Verbatim}[frame=single, gobble=7]
+        layer = inputLayer
+        ext = layer.extent()
+        data = layer.dataProvider()
+        ret_arr=[]
+        for x in range(layer.width()):
+            ret_arr.append(data.value(row,x))
+        return float32(ret_arr)
+\end{Verbatim}
     
 \section{Analysis}
 Timing our implementation for parallel hillshade and slope calculation from a raster file
