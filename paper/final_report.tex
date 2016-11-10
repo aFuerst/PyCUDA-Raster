@@ -418,7 +418,7 @@
 
 
 
-\section{Introduction}
+\section{Background and Introduction}
 % The very first letter is a 2 line initial drop letter followed
 % by the rest of the first word in caps.
 % 
@@ -434,17 +434,21 @@
 % 
 % Here we have the typical use of a "T" for an initial drop letter
 % and "HIS" in caps to complete the first word.
-\IEEEPARstart{P}{ARALLEL} computing has been adopted in many fields to improve
-computation efficiency. Although many analytics in Geographic Information
-Systems (GIS) are embarrassingly parallelizable, parallel computing has yet to
-be largely adopted in the community. We've developed open source software for
-parallel raster calculations to spur the GIS community to adopt parallel
-computing practices. This plugin was built for the popular, open source GIS
-software QGIS, and performs parallel slope, aspect and/or hillshade
-calculations on an arbitrary raster file.  We've implemented the plugin using
-Python and PyCUDA, an open source library for Python built on top of the CUDA
-programming language for \textsc{NVIDIA} graphics cards. Our current results
-indicate a efficient, scalable improvement over similar serial calculations.
+\IEEEPARstart{W}{e} are three undergraduates from across the country that came
+together in a National Science Foundation Research for Undergraduates for an 
+educational experience in professional style research. Dr. Lembo came up with
+the project that the three of us researched.Parallel computing has been adopted
+in many fields to improve computation efficiency. Although many analytics in 
+Geographic Information Systems (GIS) are embarrassingly parallelizable, 
+parallel computing has yet to be largely adopted in the community. We've 
+developed open source software for parallel raster calculations to spur the GIS
+community to adopt parallel computing practices. This plugin was built for the
+popular, open source GIS software QGIS, and performs parallel slope, aspect 
+and/or hillshade calculations on an arbitrary raster file.  We've implemented 
+the plugin using Python and PyCUDA, an open source library for Python built on 
+top of the CUDA programming language for \textsc{NVIDIA} graphics cards. Our
+current results indicate a efficient, scalable improvement over similar serial
+calculations.
 
 \section{Related Work} \label{related}
 The idea of using parallel processing in GIS had been around for a long time
@@ -453,12 +457,30 @@ creating open source, accessible parallel GIS tools has been done in the past,
 though no one method has been widely adopted. The authors of \cite{guan}
 created a C++ library for parallel raster file processing, though this only
 uses CPU parallelization. \cite{benedicic} created a GRASS GIS module based on
-cluster computing designed to predict radio-coverage.  GIS algorithms have also
-been parallelized over clusters of machines rather than just CPU
-parallelization, such as in \cite{huang}.  \cite{hpc_cuda} developed a C++
-library for simple raster calculations using CUDA as an extension to the
-proprietary ArcGIS software. We want to progress the work of \cite{hpc_cuda} to
-be more accessible to the GIS community.
+cluster computing designed to predict radio-coverage. \cite{Cheng} used 
+parallelism to try and improve the computing i/o for digital terrain analysis.
+GIS algorithms have also been parallelized over clusters of machines rather
+than just CPU parallelization, such as in \cite{huang}.  \cite{hpc_cuda} 
+developed a C++ library for simple raster calculations using CUDA as an 
+extension to the proprietary ArcGIS software. Implementation with CUDA and
+GPUs was extended upon in \cite{Xu} to test the efficiency of a string
+matching algorithm. GPUs and CUDA were also used in \cite{Saha} to apply
+brightening and darkening filters. Other members of the computer science 
+community in recent years have started testing methods to speed up the 
+computing process on large scale data and some have used GPUs as well. 
+\cite{Gaurav} tested a varity of GPU calculation methods and speed comparisons 
+between all of them for future projects. GPUs were used on large scale pixel 
+data in \cite{Wadbro} to show the usfulness of GPUs on big data. \cite{Zhang} 
+used GPUs with grids of raster data to do speed comparisons with 
+traditional search methods done on the CPU vs the GPU. Another highly 
+repetative process was tested in \cite{Yang} and \cite{Martínez-Frutos} 
+with the testing of Sliding Windows Operations over CPUs and GPUs for 
+compariaon. GPUs were used in comparison with Intel's Many Integrated Core
+from \cite{Shi} to predict better efficiency for future spatial data 
+problems. Large scale Digital Elevation Models were used in \cite{Tabik} by 
+using solar measurements and angle data through a CPU-GPU heterogeneous 
+system. We want to progress the work of these works to be more accessible 
+to the GIS community.
 
 \section{Problem Outline} \label{problem}
     \subsection{Computational Challenges}
@@ -492,7 +514,7 @@ be more accessible to the GIS community.
 
 \section{Methods} \label{methods}
     \begin{figure}
-        \includegraphics[width=\linewidth]{model.png}
+        \includegraphics[width=\linewidth]{model2.png}
         \caption{Main work flow model.}
         \label{model}
     \end{figure}
