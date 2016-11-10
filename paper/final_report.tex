@@ -619,6 +619,18 @@ to the GIS community.
     GPU. Unfortunately, kernel code to be executed on the GPU must still be
     written in C. 
     
+    \begin{align*}
+        While there is input or output
+	\\DataLoader reads input into blocks
+	\\Blocks of raw data are sent to GPUManager
+	\\GPUManager sends raw data to GPU
+	\\GPU computes raw as slope and/or aspect and/or hillshade
+	\\GPUManager takes back computed data from GPU
+	\\Computed data blocks are sent to DataSaver
+	\\DataSaver writes computed blocks to output files
+	End While
+    \end{align*}
+    
     Our program's structure follows the model in figure \ref{model}. The
     following sections describe the implementation of each process.
 
