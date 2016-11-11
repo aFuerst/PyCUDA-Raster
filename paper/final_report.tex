@@ -640,7 +640,7 @@ to the GIS community.
        or DataSaver is active
        if DataLoader errors
           Stop GPUManager 
-	  and DataSaver
+          and DataSaver
           Break while
        end If
        If GPUManager errors
@@ -676,12 +676,12 @@ to the GIS community.
 
 \begin{Verbatim}[frame=single, gobble=2]
    inputdata equals lines 
-   read from raster file
+      read from raster file
    unpack inputdata into 
-   blocks of data based on lines
+      blocks of data based on lines
    For blockdata in inputdata
-   	send blockdata in rows 
-	and columns to GPUManager
+      send blockdata in rows 
+         and columns to GPUManager
    End For	
 \end{Verbatim}
 
@@ -712,60 +712,58 @@ to the GIS community.
     for each kernel to a different saver. Each kernel is scheduled to run on
     as many GPU cores as possible, to minimize computation time.
 
-    \begin{Verbatim}[frame=single, gobble=8]
-	Grid equals 256 by 256
-	Blocks equals 32 by 32 
-		by 1
-	Blocks equals grid 
-		position 0 
-		times grid 
-		position 1
-	Thread equals blocks 
-		position 0 
-		times blocks 
-		position 1 
-		times blocks 
-		position 2
-	
-	PixelsinThread equals 
-	rows times columns 
-	divided by numberofThreads 
-	times numberofBlocks
-	
-	While pixelsinThread less than 3
-		Newgrid equals grid 
-		position 0 minus 16 by 
-		grid position 1 by 16
-		Newblocks equals newgrid 
-		position 0 times newgrid 
-		position 1
-		NewpixelsinThread equals 
-		rows times columns divided
-		by numofThreads times 
-		numofBlocks
-		pixelsinThread equals 
-		numpy ceiling with pixelsinThread
-	End While
-	
-	struct equals GPU struct of
-		numpyinteger64 by 
-		pixelsinThread by pixelsinThread
-		numpyfloat64 by NODATA by NODATA
-		numpyinteger64 by numberofcolumns
-		by column
-		numpyinteger64 by number 
-		of rows by row
-		numpyinteger numberofPixels by 
-		row times column
-		numpyfloat32 by cellsize by 
-		cellsize
-	End Struct
-	
-	copy struct into GPU
-	Function gets passed GPUdata and 
-	GPUresult and struct and block and 
-	grid
-    \end{Verbatim}
+\begin{Verbatim}[frame=single, gobble=8]
+   Grid equals 256 by 256
+   Blocks equals 32 by 32 
+      by 1
+   Blocks equals grid 
+      position 0 times grid 
+      position 1
+   Thread equals blocks 
+      position 0 
+      times blocks 
+      position 1 
+      times blocks 
+      position 2
+      
+   PixelsinThread equals 
+      rows times columns 
+      divided by numberofThreads 
+      times numberofBlocks
+	 
+   While pixelsinThread less than 3
+      Newgrid equals grid 
+         position 0 minus 16 by 
+         grid position 1 by 16
+      Newblocks equals newgrid 
+         position 0 times newgrid 
+         position 1
+      NewpixelsinThread equals 
+         rows times columns divided
+         by numofThreads times 
+         numofBlocks
+      pixelsinThread equals 
+         numpy ceiling with pixelsinThread
+   End While
+   
+   struct equals GPU struct of
+      numpyinteger64 by 
+      pixelsinThread by pixelsinThread
+      numpyfloat64 by NODATA by NODATA
+      numpyinteger64 by numberofcolumns
+         by column
+      numpyinteger64 by number 
+         of rows by row
+      numpyinteger numberofPixels by 
+         row times column
+      numpyfloat32 by cellsize by 
+         cellsize
+   End Struct
+
+   copy struct into GPU
+   Function gets passed GPUdata and 
+      GPUresult and struct and block and grid
+\end{Verbatim}
 
     \subsection{Saver}
     The data saver class takes the results of the calculations done in the GPU
@@ -774,20 +772,20 @@ to the GIS community.
     Multiple savers can all run in parallel to save the ouputs of different
     functions.
 \break
-    \begin{Verbatim}[frame=single, gobble=4]
-    Try code if no errors
-    	For row in the 
-	numberofRows
-		numpy put in ouputarrayrow 
-		and recievedinputpipe
-	END For
-    If end of file
-    	print unexpected 
-	end of file
-	Stop Everything
-    Enf If
-    Write results to output array 
-    from position 0 to number of rows
+\begin{Verbatim}[frame=single, gobble=4]
+   Try code if no errors
+      For row in the 
+         numberofRows
+         numpy put in ouputarrayrow 
+	    and recievedinputpipe
+      END For
+      If end of file
+         print unexpected 
+	    end of file
+	 Stop Everything
+      Enf If
+   Write results to output array 
+      from position 0 to number of rows
     \end{Verbatim}
 
 
@@ -805,19 +803,15 @@ to the GIS community.
     for it to work with the GPU manager or data saver.
 
 \begin{Verbatim}[frame=single, gobble=7]
-	currentlayer equals 
-	inputlayer
-	size of layer equals 
-	inputlayersize
-	data equals 
-	currentlayer data
-	create empty array
-	For element in range 
-	of layer width
-		Array appends with 
-		row data element
-	End For
-	Return array as float32 
+   currentlayer equals inputlayer
+   size of layer equals inputlayersize
+   data equals currentlayer data
+   create empty array
+   For element in range of layer width
+      Array appends with 
+         row data element
+   End For
+   Return array as float32 
 \end{Verbatim}
     
 \section{Analysis}
