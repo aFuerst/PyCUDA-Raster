@@ -633,27 +633,27 @@ to the GIS community.
     the scheduler will generate a different saver to individually save each
     output.
     
-    \begin{Verbatim}[frame=single, gobble=4]
+\begin{Verbatim}[frame=single, gobble=4]
     Start DataLoader, GPUManager
-       and DataSaver
+       and DataSaver;
     While DataLoader, GPUManager 
-       or DataSaver is active
-       if DataLoader errors
+       or DataSaver is active;
+       if (DataLoader errors)
           Stop GPUManager 
-          and DataSaver
-          Break while
+          and DataSaver;
+          Break while;
        end If
-       If GPUManager errors
+       If (GPUManager errors)
           Stop DataLoader 
-          and DataSaver
-          Break while
+          and DataSaver;
+          Break while;
        End If
-       Wait one second
+       Wait one second;
     End While
     Timer = timenow 
-       - starttime
-    print timer
-    \end{Verbatim}
+       - starttime;
+    print timer;
+\end{Verbatim}
     \break
 
     \subsection{Loader}
