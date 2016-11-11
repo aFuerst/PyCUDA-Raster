@@ -619,18 +619,6 @@ to the GIS community.
     GPU. Unfortunately, kernel code to be executed on the GPU must still be
     written in C. 
     
-    \begin{align*}
-        While there is input or output
-	\\DataLoader reads input into blocks
-	\\Blocks of raw data are sent to GPUManager
-	\\GPUManager sends raw data to GPU
-	\\GPU computes raw as slope and/or aspect and/or hillshade
-	\\GPUManager takes back computed data from GPU
-	\\Computed data blocks are sent to DataSaver
-	\\DataSaver writes computed blocks to output files
-	End While
-    \end{align*}
-    
     Our program's structure follows the model in figure \ref{model}. The
     following sections describe the implementation of each process.
 
@@ -646,24 +634,20 @@ to the GIS community.
     output.
     
     \begin{Verbatim}[frame=single, gobble=4]
-    # join all threads
-    while active_children():
-      if  loader.exitcode != 0:
-       print "Error encountered in loader"            
-       calc.stop()
-       for saver in savers:
-        saver.stop()
-       break
-      if calc.exitcode != 0:
-       loader.stop()
-       for saver in savers:
-        saver.stop()
-       print "Error encountered in GPU"
-       break
-      sleep(1)    
-    total = time() - start
-    print "Total time: %d mins, %f secs" \
-        % (total / 60, total % 60)
+    Start DataLoader, GPUManager and DataSaver
+    While DataLoader, GPUManager or DataSaver is active
+    	if DataLoader errors
+		Stop GPUManager and DataSaver
+		Break while
+	end If
+	If GPUManager errors
+		Stop DataLoader and DataSaver
+		Break while
+	End If
+	Wait one second
+    End While
+    Timer = timenow - starttime
+    print timer
     \end{Verbatim}
     \break
 
@@ -686,12 +670,11 @@ to the GIS community.
     to be a good starting point.
 
 \begin{Verbatim}[frame=single, gobble=2]
-   data = openRaster.read(0, line_num, 
-	      cols, rows, buf_type=dataType)
-   ext=struct.unpack(unpackVal*rows, data)
-   for line in range(rows):
-    output_pipe.send(float32(
-	     ext[line*cols:][:cols]))
+   inputdata equals lines read from raster file
+   unpack inputdata into blocks of data based on lines
+   For blockdata in inputdata
+   	send blockdata in rows and columns to GPUManager
+   End For	
 \end{Verbatim}
 
     The QGIS plugin version also supports reading raster data from a layer loaded
@@ -722,34 +705,32 @@ to the GIS community.
     as many GPU cores as possible, to minimize computation time.
 
     \begin{Verbatim}[frame=single, gobble=8]
-        grd = (256,256)
-        blk = (32,32,1)
-        blocks = grd[0] * grd[1]
-        threads = blk[0]*blk[1]*blk[2]
-	# pixels per threas
-        ppt = (rows * cols) / (threads * blocks)    
-
-        # minimize work by each thread]
-        while ppt < 3:
-         grd = (grd[0] - 16,grd[1] - 16)
-         blocks = grd[0] * grd[1]
-         ppt = (rows * cols)/(threads * blocks)
-        ppt = np.ceil(ppt)   
-        
-        #information struct passed to GPU
-        stc = GPUStruct([
-         (np.uint64, 'ppt', ppt),
-         (np.float64, 'NODATA', NODATA),
-         (np.uint64, 'ncols', cols),
-         (np.uint64, 'nrows', rown),
-         (np.uint64, 'npixels', rows*cols),
-         (np.float32, 'cellSize', cellsize)
-         ])
-
-        stc.copy_to_gpu()
-        #Call GPU kernel
-        func(data_gpu, result_gpu, stc, blk, grd)
-\end{Verbatim}
+	Grid equals 256 by 256
+	Blocks equals 32 by 32 by 1
+	Blocks equals grid position 0 times grid position 1
+	Thread equals blocks position 0 time blocks position 1 times blocks position 2
+	
+	PixelsinThread equals rows times columns divided by numberofThreads time numberofBlocks
+	
+	While pixelsinThread less than 3
+		Newgrid equals grid position 0 minus 16 by grid position 1 by 16
+		Newblocks equals newgrid position 0 times newgrid position 1
+		NewpixelsinThread equals rows times columns divided by numofThreads times numofBlocks
+		pixelsinThread equals numpy ceiling with pixelsinThread
+	End While
+	
+	struct equals GPU struct of
+		numpyinteger64 by pixelsinThread by pixelsinThread
+		numpyfloat64 by NODATA by NODATA
+		numpyinteger64 by numberofcolumns by column
+		numpyinteger64 by number of rows by row
+		numpyinteger numberofPixels by row times column
+		numpyfloat32 by cellsize by cellsize
+	End Struct
+	
+	copy struct into GPU
+	Function gets passed GPUdata and GPUresult and struct and block and grid
+    \end{Verbatim}
 
     \subsection{Saver}
     The data saver class takes the results of the calculations done in the GPU
@@ -759,15 +740,16 @@ to the GIS community.
     functions.
 \break
     \begin{Verbatim}[frame=single, gobble=4]
-    try:
-     for row in range(self.write_rows):
-      np.put(out_arr[row], input_pipe.recv())
-    except EOFError:
-      print "Pipe closed unexpectedly"
-       self.stop()
-    # write out rows
-    dataset.WriteArray(out_arr, 0, nrows)
-\end{Verbatim}
+    Try code if no errors
+    	For row in the numberofRows
+		numpy put in ouputarrayrow and recievedinputpipe
+	END For
+    If end of file
+    	print unexpected end of file
+	Stop Everything
+    Enf If
+    Write results to output array from position 0 to number of rows
+    \end{Verbatim}
 
 
     \subsection{QGIS Plugin}
@@ -784,13 +766,14 @@ to the GIS community.
     for it to work with the GPU manager or data saver.
 
 \begin{Verbatim}[frame=single, gobble=7]
-        layer = inputLayer
-        ext = layer.extent()
-        data = layer.dataProvider()
-        ret_arr=[]
-        for x in range(layer.width()):
-            ret_arr.append(data.value(row,x))
-        return float32(ret_arr)
+	currentlayer equals inputlayer
+	size of layer equals inputlayersize
+	data equals currentlayer data
+	create empty  array
+	For element in range of layer width
+		Array appends with row data element
+	End For
+	Return array as float32 
 \end{Verbatim}
     
 \section{Analysis}
