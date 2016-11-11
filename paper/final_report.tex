@@ -635,23 +635,23 @@ to the GIS community.
     
     \begin{Verbatim}[frame=single, gobble=4]
     Start DataLoader, GPUManager
-    	and DataSaver
+       and DataSaver
     While DataLoader, GPUManager 
-    	or DataSaver is active
-    	if DataLoader errors
-		Stop GPUManager 
-		and DataSaver
-		Break while
-	end If
-	If GPUManager errors
-		Stop DataLoader 
-		and DataSaver
-		Break while
-	End If
-	Wait one second
+       or DataSaver is active
+       if DataLoader errors
+          Stop GPUManager 
+	  and DataSaver
+          Break while
+       end If
+       If GPUManager errors
+          Stop DataLoader 
+          and DataSaver
+          Break while
+       End If
+       Wait one second
     End While
     Timer = timenow 
-    	- starttime
+       - starttime
     print timer
     \end{Verbatim}
     \break
