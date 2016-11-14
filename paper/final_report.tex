@@ -675,14 +675,14 @@ to the GIS community.
     to be a good starting point.
 
 \begin{Verbatim}[frame=single, gobble=2]
-   inputdata equals lines 
-      read from raster file
-   unpack inputdata into 
-      blocks of data based on lines
-   For blockdata in inputdata
-      send blockdata in rows 
-         and columns to GPUManager
-   End For	
+  inputdata equals lines 
+     read from raster file
+  unpack inputdata into 
+     blocks of data based on lines
+  For blockdata in inputdata
+     send blockdata in rows 
+        and columns to GPUManager
+  End For	
 \end{Verbatim}
 
     The QGIS plugin version also supports reading raster data from a layer loaded
@@ -762,7 +762,7 @@ to the GIS community.
 
         copy struct into GPU
         Function gets passed GPUdata and 
-           GPUresult and struct and block and grid
+          GPUresult and struct and block and grid
 \end{Verbatim}
 
     \subsection{Saver}
@@ -782,7 +782,7 @@ to the GIS community.
        If end of file
           print unexpected 
 	     end of file
-	  Stop Everything
+          Stop Everything
        Enf If
     Write results to output array 
        from position 0 to number of rows
@@ -803,10 +803,10 @@ to the GIS community.
     for it to work with the GPU manager or data saver.
 
 \begin{Verbatim}[frame=single, gobble=7]
-       currentlayer equals inputlayer
-       size of layer equals inputlayersize
-       data equals currentlayer data
-       create empty array
+       Currentlayer equals inputlayer
+       Size of layer equals inputlayersize
+       Data equals currentlayer data
+       Create empty array
        For element in range of layer width
           Array appends with 
              row data element
