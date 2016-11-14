@@ -675,13 +675,13 @@ to the GIS community.
     to be a good starting point.
 
 \begin{Verbatim}[frame=single, gobble=2]
-  inputdata equals lines 
-     read from raster file
+  inputdata equals lines
+     read from raster file;
   unpack inputdata into 
-     blocks of data based on lines
-  For blockdata in inputdata
+     blocks of data based on lines;
+  For (blockdata in inputdata)
      send blockdata in rows 
-        and columns to GPUManager
+        and columns to GPUManager;
   End For	
 \end{Verbatim}
 
@@ -713,56 +713,56 @@ to the GIS community.
     as many GPU cores as possible, to minimize computation time.
 
 \begin{Verbatim}[frame=single, gobble=8]
-        Grid equals 256 by 256
+        Grid equals 256 by 256;
         Blocks equals 32 by 32 
-           by 1
+           by 1;
         Blocks equals grid 
            position 0 times grid 
-           position 1
+           position 1;
         Thread equals blocks 
            position 0 
            times blocks 
            position 1 
            times blocks 
-           position 2
+           position 2;
       
         PixelsinThread equals 
            rows times columns 
            divided by numberofThreads 
-           times numberofBlocks
+           times numberofBlocks;
 	 
-        While pixelsinThread less than 3
+        While (pixelsinThread less than 3)
             Newgrid equals grid 
                position 0 minus 16 by 
-               grid position 1 by 16
+               grid position 1 by 16;
             Newblocks equals newgrid 
                position 0 times newgrid 
-               position 1
+               position 1;
             NewpixelsinThread equals 
                rows times columns divided
                by numofThreads times 
-               numofBlocks
+               numofBlocks;
             pixelsinThread equals 
-               numpy ceiling with pixelsinThread
+               numpy ceiling with pixelsinThread;
         End While
    
         struct equals GPU struct of
            numpyinteger64 by 
-           pixelsinThread by pixelsinThread
-           numpyfloat64 by NODATA by NODATA
+              pixelsinThread by pixelsinThread;
+           numpyfloat64 by NODATA by NODATA;
            numpyinteger64 by numberofcolumns
-              by column
+              by column;
            numpyinteger64 by number 
-              of rows by row
+              of rows by row;
            numpyinteger numberofPixels by 
-              row times column
+              row times column;
            numpyfloat32 by cellsize by 
-              cellsize
+              cellsize;
         End Struct
 
-        copy struct into GPU
+        Copy struct into GPU;
         Function gets passed GPUdata and 
-          GPUresult and struct and block and grid
+         GPUresult and struct and block and grid;
 \end{Verbatim}
 
     \subsection{Saver}
@@ -773,19 +773,20 @@ to the GIS community.
     functions.
 \break
 \begin{Verbatim}[frame=single, gobble=4]
-    Try code if no errors
-       For row in the 
-          numberofRows
+    Try (code if no errors)
+       For (row in the 
+          numberofRows)
           numpy put in ouputarrayrow 
-	     and recievedinputpipe
+	     and recievedinputpipe;
        END For
-       If end of file
+       If (end of file)
           print unexpected 
-	     end of file
-          Stop Everything
+             end of file;
+          Stop Everything;
        Enf If
+    End Try
     Write results to output array 
-       from position 0 to number of rows
+       from position 0 to number of rows;
 \end{Verbatim}
 
 
@@ -803,15 +804,15 @@ to the GIS community.
     for it to work with the GPU manager or data saver.
 
 \begin{Verbatim}[frame=single, gobble=7]
-       Currentlayer equals inputlayer
-       Size of layer equals inputlayersize
-       Data equals currentlayer data
-       Create empty array
-       For element in range of layer width
+       Currentlayer equals inputlayer;
+       Size of layer equals inputlayersize;
+       Data equals currentlayer data;
+       Create empty array;
+       For (element in range of layer width)
           Array appends with 
-             row data element
+             row data element;
        End For
-       Return array as float32 
+       Return array as float32; 
 \end{Verbatim}
     
 \section{Analysis}
