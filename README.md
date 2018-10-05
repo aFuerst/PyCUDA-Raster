@@ -12,7 +12,7 @@ aspect, and hillshade from an elevation file.
 Command line tool, and stand-alone GUI work on both Windows and Linux with proper
 dependencies installed. The QGIS plugin is currently only compatible with Linux.
 
-##Dependencies
+## Dependencies
 
 [Python 2.7.12](https://www.python.org/downloads/)
 
@@ -37,7 +37,7 @@ The gpustruct class included here was taken from another
 [git repo.](https://github.com/compmem/cutools)
 Thanks to OSU!
 
-##Installation
+## Installation
 
 Simply download this git repository to your local machine and put them
 wherever you want. If your CUDA installation folder isn't already set on your
@@ -53,7 +53,7 @@ In Windows the default location is
  C:\Users\username\\.qgis\python\plugins
 ```
 
-##Use
+## Use
 
 This can be used via a command line interface or QGIS plugin. 
 
